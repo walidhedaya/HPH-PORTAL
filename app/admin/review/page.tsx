@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -33,7 +35,6 @@ export default function AdminReviewPage() {
     return <div style={{ padding: 40 }}>Loading...</div>;
   }
 
-  // ================= Upload Draft =================
   const uploadDraft = async () => {
     if (!draftFile || !bl) return;
 
@@ -54,7 +55,6 @@ export default function AdminReviewPage() {
     }
   };
 
-  // ================= Upload Final =================
   const uploadFinalInvoice = async () => {
     if (!finalFile || !bl) return;
 
@@ -75,7 +75,6 @@ export default function AdminReviewPage() {
     }
   };
 
-  // ================= Upload Gate =================
   const uploadGateSlip = async () => {
     if (!gateFile || !bl) return;
 
@@ -96,7 +95,6 @@ export default function AdminReviewPage() {
     }
   };
 
-  // ================= Status =================
   const updateStatus = async (status: string) => {
     if (!bl) return;
 
@@ -133,7 +131,6 @@ export default function AdminReviewPage() {
 
         <div className="admin-grid">
 
-          {/* Uploaded Import Documents */}
           <div className="mini-card">
             <h4>Uploaded Import Documents</h4>
             {data.pdf_filename ? (
@@ -148,7 +145,6 @@ export default function AdminReviewPage() {
             )}
           </div>
 
-          {/* Proof of Payment */}
           <div className="mini-card">
             <h4>Proof of Payment</h4>
             {data.payment_proof_filename ? (
@@ -163,7 +159,6 @@ export default function AdminReviewPage() {
             )}
           </div>
 
-          {/* Draft Invoice */}
           <div className="mini-card">
             <h4>Draft Invoice</h4>
 
@@ -205,7 +200,6 @@ export default function AdminReviewPage() {
             )}
           </div>
 
-          {/* Final Invoice */}
           <div className="mini-card">
             <h4>Final Invoice</h4>
 
@@ -232,7 +226,6 @@ export default function AdminReviewPage() {
             )}
           </div>
 
-          {/* Gate Slip */}
           <div className="mini-card">
             <h4>Gate Slip</h4>
 
@@ -261,7 +254,6 @@ export default function AdminReviewPage() {
 
         </div>
 
-        {/* STATUS ACTIONS */}
         <div style={{ marginTop: "30px" }}>
           <button onClick={() => updateStatus("APPROVED")}>
             Approve
