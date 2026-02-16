@@ -7,10 +7,15 @@ type LoginBody = {
   password: string;
 };
 
+type User = {
+  tax_id: string;
+  password: string;
+  role: string;
+};
+
 export async function POST(req: Request) {
   try {
     const body: LoginBody = await req.json();
-
     const { tax_id, password } = body;
 
     if (!tax_id || !password) {
@@ -22,11 +27,7 @@ export async function POST(req: Request) {
 
     const user = db
       .prepare("SELECT * FROM users WHERE tax_id = ?")
-      .get(tax_id) as {
-        tax_id: string;
-        password: string;
-        role: string;
-      } | undefined;
+      .get(tax_id) as User | undefined;
 
     if (!user) {
       return NextResponse.json(
