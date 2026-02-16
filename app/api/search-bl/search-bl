@@ -1,0 +1,28 @@
+import { NextResponse } from "next/server";
+import db from "../../../lib/db";
+
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const bl = searchParams.get("bl");
+  const terminal = searchParams.get("terminal");
+
+  if (!bl || !terminal) {
+    return NextResponse.json({ found: false });
+  }
+
+  const row = db
+    .prepare(
+      "SELECT * FROM shipments WHERE bl = ? AND terminal = ?"
+    )
+    .get(bl, terminal);
+
+  if (!row) {
+    return NextResponse.json({ found: false });
+  }
+
+  return NextResponse.json({
+    found: true,
+    shipment: row,
+  });
+}
