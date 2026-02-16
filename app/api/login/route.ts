@@ -15,6 +15,7 @@ type User = {
 
 export async function POST(req: Request) {
   try {
+    // Parse request body
     const body: LoginBody = await req.json();
     const { tax_id, password } = body;
 
@@ -25,6 +26,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // Get user from DB
     const user = db
       .prepare("SELECT * FROM users WHERE tax_id = ?")
       .get(tax_id) as User | undefined;
@@ -36,6 +38,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // Compare password
     const valid = bcrypt.compareSync(password, user.password);
 
     if (!valid) {
@@ -45,14 +48,15 @@ export async function POST(req: Request) {
       );
     }
 
+    // Success
     return NextResponse.json({
       success: true,
       tax_id: user.tax_id,
       role: user.role,
     });
 
-  } catch (err) {
-    console.error("LOGIN ERROR:", err);
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
     return NextResponse.json(
       { error: "Server error" },
       { status: 500 }
