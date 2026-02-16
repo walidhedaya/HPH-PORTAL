@@ -1,8 +1,7 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
 
 function AdminReviewInner() {
   const searchParams = useSearchParams();
@@ -14,16 +13,15 @@ function AdminReviewInner() {
   const [gateFile, setGateFile] = useState<File | null>(null);
   const [adminComment, setAdminComment] = useState("");
 
-  const fetchData = () => {
+  const fetchData = async () => {
     if (!bl) return;
 
-    fetch(`/api/search-bl?bl=${bl}`)
-      .then(res => res.json())
-      .then(result => {
-        if (result.success) {
-          setData(result.data);
-        }
-      });
+    const res = await fetch(`/api/search-bl?bl=${bl}`);
+    const result = await res.json();
+
+    if (result.success) {
+      setData(result.data);
+    }
   };
 
   useEffect(() => {
@@ -123,8 +121,120 @@ function AdminReviewInner() {
         <p><strong>Consignee:</strong> {data.consignee}</p>
         <p><strong>Terminal:</strong> {data.terminal}</p>
 
-        {/* باقي JSX بتاعك زي ما هو بالظبط */}
-        
+        <p>
+          <strong>Documents Status:</strong>{" "}
+          {data.pdf_status || "No Documents Uploaded"}
+        </p>
+
+        <div className="admin-grid">
+
+          <div className="mini-card">
+            <h4>Uploaded Import Documents</h4>
+            {data.pdf_filename ? (
+              <a href={`/uploads/import-documents/${data.pdf_filename}`} target="_blank">
+                View Uploaded Documents
+              </a>
+            ) : (
+              <p>No Documents Uploaded</p>
+            )}
+          </div>
+
+          <div className="mini-card">
+            <h4>Proof of Payment</h4>
+            {data.payment_proof_filename ? (
+              <a href={`/uploads/payments/${data.payment_proof_filename}`} target="_blank">
+                View Proof of Payment
+              </a>
+            ) : (
+              <p>No Proof Uploaded</p>
+            )}
+          </div>
+
+          <div className="mini-card">
+            <h4>Draft Invoice</h4>
+            {data.draft_invoice_filename ? (
+              <>
+                <a href={`/uploads/draft/${data.draft_invoice_filename}`} target="_blank">
+                  View Draft Invoice
+                </a>
+                <input type="file" accept=".pdf"
+                  onChange={(e) => setDraftFile(e.target.files?.[0] || null)}
+                />
+                <button onClick={uploadDraft}>Replace Draft</button>
+              </>
+            ) : (
+              <>
+                <input type="file" accept=".pdf"
+                  onChange={(e) => setDraftFile(e.target.files?.[0] || null)}
+                />
+                <button onClick={uploadDraft}>Upload Draft</button>
+              </>
+            )}
+          </div>
+
+          <div className="mini-card">
+            <h4>Final Invoice</h4>
+            {data.final_invoice_filename ? (
+              <a href={`/uploads/final/${data.final_invoice_filename}`} target="_blank">
+                Review Final Invoice
+              </a>
+            ) : (
+              <>
+                <input type="file" accept=".pdf"
+                  onChange={(e) => setFinalFile(e.target.files?.[0] || null)}
+                />
+                <button onClick={uploadFinalInvoice}>Upload Final Invoice</button>
+              </>
+            )}
+          </div>
+
+          <div className="mini-card">
+            <h4>Gate Slip</h4>
+            {data.gate_pass_filename ? (
+              <a href={`/uploads/gates/${data.gate_pass_filename}`} target="_blank">
+                View Gate Slip
+              </a>
+            ) : (
+              <>
+                <input type="file" accept=".pdf"
+                  onChange={(e) => setGateFile(e.target.files?.[0] || null)}
+                />
+                <button onClick={uploadGateSlip}>Upload Gate Slip</button>
+              </>
+            )}
+          </div>
+
+        </div>
+
+        <div style={{ marginTop: 30 }}>
+          <button onClick={() => updateStatus("APPROVED")}>
+            Approve
+          </button>
+
+          <div style={{ marginTop: 15 }}>
+            <textarea
+              placeholder="Write required documents or comments here..."
+              value={adminComment}
+              onChange={(e) => setAdminComment(e.target.value)}
+              style={{
+                width: "100%",
+                padding: 10,
+                borderRadius: 8,
+                border: "1px solid #ccc",
+                minHeight: 80,
+                marginBottom: 10
+              }}
+            />
+
+            <button
+              style={{ background: "#d97706" }}
+              onClick={() => updateStatus("NEED MORE DOCS")}
+            >
+              Need More Docs
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   );
