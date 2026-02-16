@@ -2,9 +2,16 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import bcrypt from "bcryptjs";
 
+type LoginBody = {
+  tax_id: string;
+  password: string;
+};
+
 export async function POST(req: Request) {
   try {
-    const { tax_id, password } = await req.json();
+    const body: LoginBody = await req.json();
+
+    const { tax_id, password } = body;
 
     if (!tax_id || !password) {
       return NextResponse.json(
@@ -14,8 +21,12 @@ export async function POST(req: Request) {
     }
 
     const user = db
-      .prepare(`SELECT * FROM users WHERE tax_id = ?`)
-      .get(tax_id);
+      .prepare("SELECT * FROM users WHERE tax_id = ?")
+      .get(tax_id) as {
+        tax_id: string;
+        password: string;
+        role: string;
+      } | undefined;
 
     if (!user) {
       return NextResponse.json(
@@ -38,6 +49,7 @@ export async function POST(req: Request) {
       tax_id: user.tax_id,
       role: user.role,
     });
+
   } catch (err) {
     console.error("LOGIN ERROR:", err);
     return NextResponse.json(
