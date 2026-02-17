@@ -30,7 +30,6 @@ export async function POST(req: Request) {
 
     // ===============================
     // Upload to Supabase Storage
-    // Bucket name: documents
     // ===============================
     const { error } = await supabase.storage
       .from("documents")
@@ -48,16 +47,7 @@ export async function POST(req: Request) {
     }
 
     // ===============================
-    // Get Public URL
-    // ===============================
-    const { data } = supabase.storage
-      .from("documents")
-      .getPublicUrl(filename);
-
-    const publicUrl = data.publicUrl;
-
-    // ===============================
-    // Update Database
+    // Update Database (STORE FILENAME ONLY)
     // ===============================
     db.prepare(`
       UPDATE shipments
@@ -67,7 +57,7 @@ export async function POST(req: Request) {
         pdf_status = ?
       WHERE bl_number = ?
     `).run(
-      publicUrl,
+      filename,               // ✅ ONLY filename
       now.toISOString(),
       "UNDER REVIEW",
       bl
@@ -75,7 +65,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      url: publicUrl,
+      filename,
       status: "UNDER REVIEW",
     });
 
