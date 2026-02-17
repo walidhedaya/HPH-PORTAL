@@ -13,6 +13,13 @@ function AdminReviewInner() {
   const [gateFile, setGateFile] = useState<File | null>(null);
   const [adminComment, setAdminComment] = useState("");
 
+  const supabaseBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const bucketName = "documents";
+
+  const getFileUrl = (filename: string) => {
+    return `${supabaseBaseUrl}/storage/v1/object/public/${bucketName}/${filename}`;
+  };
+
   const fetchData = async () => {
     if (!bl) return;
 
@@ -128,10 +135,15 @@ function AdminReviewInner() {
 
         <div className="admin-grid">
 
+          {/* IMPORT DOCUMENTS */}
           <div className="mini-card">
             <h4>Uploaded Import Documents</h4>
             {data.pdf_filename ? (
-              <a href={`/uploads/import-documents/${data.pdf_filename}`} target="_blank">
+              <a
+                href={getFileUrl(data.pdf_filename)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 View Uploaded Documents
               </a>
             ) : (
@@ -139,10 +151,15 @@ function AdminReviewInner() {
             )}
           </div>
 
+          {/* PAYMENT */}
           <div className="mini-card">
             <h4>Proof of Payment</h4>
             {data.payment_proof_filename ? (
-              <a href={`/uploads/payments/${data.payment_proof_filename}`} target="_blank">
+              <a
+                href={getFileUrl(data.payment_proof_filename)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 View Proof of Payment
               </a>
             ) : (
@@ -150,56 +167,91 @@ function AdminReviewInner() {
             )}
           </div>
 
+          {/* DRAFT */}
           <div className="mini-card">
             <h4>Draft Invoice</h4>
             {data.draft_invoice_filename ? (
               <>
-                <a href={`/uploads/draft/${data.draft_invoice_filename}`} target="_blank">
+                <a
+                  href={getFileUrl(data.draft_invoice_filename)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   View Draft Invoice
                 </a>
-                <input type="file" accept=".pdf"
-                  onChange={(e) => setDraftFile(e.target.files?.[0] || null)}
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) =>
+                    setDraftFile(e.target.files?.[0] || null)
+                  }
                 />
                 <button onClick={uploadDraft}>Replace Draft</button>
               </>
             ) : (
               <>
-                <input type="file" accept=".pdf"
-                  onChange={(e) => setDraftFile(e.target.files?.[0] || null)}
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) =>
+                    setDraftFile(e.target.files?.[0] || null)
+                  }
                 />
                 <button onClick={uploadDraft}>Upload Draft</button>
               </>
             )}
           </div>
 
+          {/* FINAL */}
           <div className="mini-card">
             <h4>Final Invoice</h4>
             {data.final_invoice_filename ? (
-              <a href={`/uploads/final/${data.final_invoice_filename}`} target="_blank">
+              <a
+                href={getFileUrl(data.final_invoice_filename)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Review Final Invoice
               </a>
             ) : (
               <>
-                <input type="file" accept=".pdf"
-                  onChange={(e) => setFinalFile(e.target.files?.[0] || null)}
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) =>
+                    setFinalFile(e.target.files?.[0] || null)
+                  }
                 />
-                <button onClick={uploadFinalInvoice}>Upload Final Invoice</button>
+                <button onClick={uploadFinalInvoice}>
+                  Upload Final Invoice
+                </button>
               </>
             )}
           </div>
 
+          {/* GATE */}
           <div className="mini-card">
             <h4>Gate Slip</h4>
             {data.gate_pass_filename ? (
-              <a href={`/uploads/gates/${data.gate_pass_filename}`} target="_blank">
+              <a
+                href={getFileUrl(data.gate_pass_filename)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 View Gate Slip
               </a>
             ) : (
               <>
-                <input type="file" accept=".pdf"
-                  onChange={(e) => setGateFile(e.target.files?.[0] || null)}
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) =>
+                    setGateFile(e.target.files?.[0] || null)
+                  }
                 />
-                <button onClick={uploadGateSlip}>Upload Gate Slip</button>
+                <button onClick={uploadGateSlip}>
+                  Upload Gate Slip
+                </button>
               </>
             )}
           </div>
