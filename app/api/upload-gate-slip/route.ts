@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import db from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 
 export async function POST(req: Request) {
   try {
@@ -16,17 +15,6 @@ export async function POST(req: Request) {
       );
     }
 
-    const uploadDir = path.join(
-      process.cwd(),
-      "public",
-      "uploads",
-      "gates"
-    );
-
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
     const now = new Date();
     const timestamp = now
       .toISOString()
@@ -34,24 +22,61 @@ export async function POST(req: Request) {
       .replace("T", "_")
       .split(".")[0];
 
+    // ===============================
+    // FILE NAME + PATH INSIDE BUCKET
+    // documents/gate/
+    // ===============================
     const filename = `${bl}_GATE_${timestamp}.pdf`;
-    const filePath = path.join(uploadDir, filename);
+    const filePath = `gate/${filename}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(filePath, buffer);
 
+    // ===============================
+    // UPLOAD TO SUPABASE STORAGE
+    // Bucket: documents
+    // ===============================
+    const { error } = await supabase.storage
+      .from("documents")
+      .upload(filePath, buffer, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Supabase upload error:", error);
+      return NextResponse.json(
+        { error: "Upload failed" },
+        { status: 500 }
+      );
+    }
+
+    // ===============================
+    // GET PUBLIC URL
+    // ===============================
+    const { data } = supabase.storage
+      .from("documents")
+      .getPublicUrl(filePath);
+
+    const publicUrl = data.publicUrl;
+
+    // ===============================
+    // UPDATE DATABASE (Case Safe)
+    // ===============================
     db.prepare(`
       UPDATE shipments
       SET
         gate_pass_filename = ?,
         gate_pass_uploaded_at = ?
-      WHERE bl_number = ?
-    `).run(filename, now.toISOString(), bl);
+      WHERE LOWER(bl_number) = LOWER(?)
+    `).run(
+      publicUrl,
+      now.toISOString(),
+      bl
+    );
 
     return NextResponse.json({
       success: true,
-      filename,
-      url: `/uploads/gates/${filename}`,
+      url: publicUrl,
     });
 
   } catch (err) {
