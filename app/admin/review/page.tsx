@@ -13,13 +13,6 @@ function AdminReviewInner() {
   const [gateFile, setGateFile] = useState<File | null>(null);
   const [adminComment, setAdminComment] = useState("");
 
-  const supabaseBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const bucketName = "documents";
-
-  const getFileUrl = (filename: string) => {
-    return `${supabaseBaseUrl}/storage/v1/object/public/${bucketName}/${filename}`;
-  };
-
   const fetchData = async () => {
     if (!bl) return;
 
@@ -123,7 +116,6 @@ function AdminReviewInner() {
   return (
     <div className="page-bg">
       <div className="card admin-card">
-
         <h2>Review BL: {data.bl_number}</h2>
         <p><strong>Consignee:</strong> {data.consignee}</p>
         <p><strong>Terminal:</strong> {data.terminal}</p>
@@ -140,7 +132,7 @@ function AdminReviewInner() {
             <h4>Uploaded Import Documents</h4>
             {data.pdf_filename ? (
               <a
-                href={getFileUrl(data.pdf_filename)}
+                href={data.pdf_filename}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -156,7 +148,7 @@ function AdminReviewInner() {
             <h4>Proof of Payment</h4>
             {data.payment_proof_filename ? (
               <a
-                href={getFileUrl(data.payment_proof_filename)}
+                href={data.payment_proof_filename}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -173,7 +165,7 @@ function AdminReviewInner() {
             {data.draft_invoice_filename ? (
               <>
                 <a
-                  href={getFileUrl(data.draft_invoice_filename)}
+                  href={data.draft_invoice_filename}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -207,7 +199,7 @@ function AdminReviewInner() {
             <h4>Final Invoice</h4>
             {data.final_invoice_filename ? (
               <a
-                href={getFileUrl(data.final_invoice_filename)}
+                href={data.final_invoice_filename}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -234,7 +226,7 @@ function AdminReviewInner() {
             <h4>Gate Slip</h4>
             {data.gate_pass_filename ? (
               <a
-                href={getFileUrl(data.gate_pass_filename)}
+                href={data.gate_pass_filename}
                 target="_blank"
                 rel="noopener noreferrer"
               >
