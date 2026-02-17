@@ -116,6 +116,7 @@ function AdminReviewInner() {
   return (
     <div className="page-bg">
       <div className="card admin-card">
+
         <h2>Review BL: {data.bl_number}</h2>
         <p><strong>Consignee:</strong> {data.consignee}</p>
         <p><strong>Terminal:</strong> {data.terminal}</p>
