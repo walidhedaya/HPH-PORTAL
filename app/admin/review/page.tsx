@@ -13,14 +13,20 @@ function AdminReviewInner() {
   const [gateFile, setGateFile] = useState<File | null>(null);
   const [adminComment, setAdminComment] = useState("");
 
+  const [loading, setLoading] = useState(false);
+
   const fetchData = async () => {
     if (!bl) return;
 
-    const res = await fetch(`/api/search-bl?bl=${bl}`);
-    const result = await res.json();
+    try {
+      const res = await fetch(`/api/search-bl?bl=${bl}`);
+      const result = await res.json();
 
-    if (result.success) {
-      setData(result.data);
+      if (result.success) {
+        setData(result.data);
+      }
+    } catch (err) {
+      console.error("Fetch error:", err);
     }
   };
 
@@ -32,85 +38,80 @@ function AdminReviewInner() {
     return <div style={{ padding: 40 }}>Loading...</div>;
   }
 
-  const uploadDraft = async () => {
-    if (!draftFile || !bl) return;
+  const handleUpload = async (
+    file: File | null,
+    endpoint: string,
+    reset: () => void
+  ) => {
+    if (!file || !bl) return;
 
-    const formData = new FormData();
-    formData.append("file", draftFile);
-    formData.append("bl", bl);
+    setLoading(true);
 
-    const res = await fetch("/api/upload-draft-invoice", {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("bl", bl);
 
-    const result = await res.json();
+      const res = await fetch(endpoint, {
+        method: "POST",
+        body: formData,
+      });
 
-    if (result.success) {
-      setDraftFile(null);
-      fetchData();
-    }
-  };
+      const result = await res.json();
 
-  const uploadFinalInvoice = async () => {
-    if (!finalFile || !bl) return;
-
-    const formData = new FormData();
-    formData.append("file", finalFile);
-    formData.append("bl", bl);
-
-    const res = await fetch("/api/upload-final-invoice", {
-      method: "POST",
-      body: formData,
-    });
-
-    const result = await res.json();
-
-    if (result.success) {
-      setFinalFile(null);
-      fetchData();
-    }
-  };
-
-  const uploadGateSlip = async () => {
-    if (!gateFile || !bl) return;
-
-    const formData = new FormData();
-    formData.append("file", gateFile);
-    formData.append("bl", bl);
-
-    const res = await fetch("/api/upload-gate-slip", {
-      method: "POST",
-      body: formData,
-    });
-
-    const result = await res.json();
-
-    if (result.success) {
-      setGateFile(null);
-      fetchData();
+      if (result.success) {
+        reset();
+        fetchData();
+      } else {
+        alert(result.error || "Upload failed");
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert("Server error during upload");
+    } finally {
+      setLoading(false);
     }
   };
 
   const updateStatus = async (status: string) => {
     if (!bl) return;
 
-    const res = await fetch("/api/review-bl", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bl,
-        status,
-        comment: status === "NEED MORE DOCS" ? adminComment : null,
-      }),
-    });
+    setLoading(true);
 
-    const result = await res.json();
+    try {
+      const res = await fetch("/api/review-bl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bl,
+          status,
+          comment: status === "NEED MORE DOCS" ? adminComment : null,
+        }),
+      });
 
-    if (result.success) {
-      setAdminComment("");
-      fetchData();
+      const result = await res.json();
+
+      if (result.success) {
+        setAdminComment("");
+        fetchData();
+      }
+    } catch (err) {
+      console.error("Status update error:", err);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const renderLink = (url?: string | null, label?: string) => {
+    if (!url || !url.startsWith("http")) {
+      return <p>No File Uploaded</p>;
+    }
+
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        {label}
+      </a>
+    );
   };
 
   return (
@@ -128,131 +129,92 @@ function AdminReviewInner() {
 
         <div className="admin-grid">
 
-          {/* IMPORT DOCUMENTS */}
           <div className="mini-card">
             <h4>Uploaded Import Documents</h4>
-            {data.pdf_filename ? (
-              <a
-                href={data.pdf_filename}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                View Uploaded Documents
-              </a>
-            ) : (
-              <p>No Documents Uploaded</p>
-            )}
+            {renderLink(data.pdf_filename, "View Uploaded Documents")}
           </div>
 
-          {/* PAYMENT */}
           <div className="mini-card">
             <h4>Proof of Payment</h4>
-            {data.payment_proof_filename ? (
-              <a
-                href={data.payment_proof_filename}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                View Proof of Payment
-              </a>
-            ) : (
-              <p>No Proof Uploaded</p>
-            )}
+            {renderLink(data.payment_proof_filename, "View Proof of Payment")}
           </div>
 
-          {/* DRAFT */}
           <div className="mini-card">
             <h4>Draft Invoice</h4>
-            {data.draft_invoice_filename ? (
-              <>
-                <a
-                  href={data.draft_invoice_filename}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  View Draft Invoice
-                </a>
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) =>
-                    setDraftFile(e.target.files?.[0] || null)
-                  }
-                />
-                <button onClick={uploadDraft}>Replace Draft</button>
-              </>
-            ) : (
-              <>
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) =>
-                    setDraftFile(e.target.files?.[0] || null)
-                  }
-                />
-                <button onClick={uploadDraft}>Upload Draft</button>
-              </>
-            )}
+            {renderLink(data.draft_invoice_filename, "View Draft Invoice")}
+            <input
+              type="file"
+              accept=".pdf"
+              onChange={(e) =>
+                setDraftFile(e.target.files?.[0] || null)
+              }
+            />
+            <button
+              disabled={loading}
+              onClick={() =>
+                handleUpload(
+                  draftFile,
+                  "/api/upload-draft-invoice",
+                  () => setDraftFile(null)
+                )
+              }
+            >
+              Upload / Replace Draft
+            </button>
           </div>
 
-          {/* FINAL */}
           <div className="mini-card">
             <h4>Final Invoice</h4>
-            {data.final_invoice_filename ? (
-              <a
-                href={data.final_invoice_filename}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Review Final Invoice
-              </a>
-            ) : (
-              <>
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) =>
-                    setFinalFile(e.target.files?.[0] || null)
-                  }
-                />
-                <button onClick={uploadFinalInvoice}>
-                  Upload Final Invoice
-                </button>
-              </>
-            )}
+            {renderLink(data.final_invoice_filename, "View Final Invoice")}
+            <input
+              type="file"
+              accept=".pdf"
+              onChange={(e) =>
+                setFinalFile(e.target.files?.[0] || null)
+              }
+            />
+            <button
+              disabled={loading}
+              onClick={() =>
+                handleUpload(
+                  finalFile,
+                  "/api/upload-final-invoice",
+                  () => setFinalFile(null)
+                )
+              }
+            >
+              Upload Final Invoice
+            </button>
           </div>
 
-          {/* GATE */}
           <div className="mini-card">
             <h4>Gate Slip</h4>
-            {data.gate_pass_filename ? (
-              <a
-                href={data.gate_pass_filename}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                View Gate Slip
-              </a>
-            ) : (
-              <>
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) =>
-                    setGateFile(e.target.files?.[0] || null)
-                  }
-                />
-                <button onClick={uploadGateSlip}>
-                  Upload Gate Slip
-                </button>
-              </>
-            )}
+            {renderLink(data.gate_pass_filename, "View Gate Slip")}
+            <input
+              type="file"
+              accept=".pdf"
+              onChange={(e) =>
+                setGateFile(e.target.files?.[0] || null)
+              }
+            />
+            <button
+              disabled={loading}
+              onClick={() =>
+                handleUpload(
+                  gateFile,
+                  "/api/upload-gate-slip",
+                  () => setGateFile(null)
+                )
+              }
+            >
+              Upload Gate Slip
+            </button>
           </div>
 
         </div>
 
         <div style={{ marginTop: 30 }}>
-          <button onClick={() => updateStatus("APPROVED")}>
+          <button disabled={loading} onClick={() => updateStatus("APPROVED")}>
             Approve
           </button>
 
@@ -272,6 +234,7 @@ function AdminReviewInner() {
             />
 
             <button
+              disabled={loading}
               style={{ background: "#d97706" }}
               onClick={() => updateStatus("NEED MORE DOCS")}
             >
