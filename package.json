@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@prisma/client": "^7.2.0",
-    "@supabase/supabase-js": "^2.95.3",
+    "@supabase/supabase-js": "^2.96.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
     "framer-motion": "^12.24.10",

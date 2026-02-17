@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import db from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 
 export async function POST(req: Request) {
   try {
@@ -17,21 +16,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // ===============================
-    // SAVE IN: public/uploads/import-documents
-    // ===============================
-    const uploadDir = path.join(
-      process.cwd(),
-      "public",
-      "uploads",
-      "import-documents"
-    );
-
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
     const now = new Date();
+
     const timestamp = now
       .toISOString()
       .replace(/:/g, "-")
@@ -39,13 +25,39 @@ export async function POST(req: Request) {
       .split(".")[0];
 
     const filename = `${bl}_${timestamp}.pdf`;
-    const filePath = path.join(uploadDir, filename);
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(filePath, buffer);
 
     // ===============================
-    // UPDATE DATABASE
+    // Upload to Supabase Storage
+    // Bucket name: documents
+    // ===============================
+    const { error } = await supabase.storage
+      .from("documents")
+      .upload(filename, buffer, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Supabase upload error:", error);
+      return NextResponse.json(
+        { error: "Upload failed" },
+        { status: 500 }
+      );
+    }
+
+    // ===============================
+    // Get Public URL
+    // ===============================
+    const { data } = supabase.storage
+      .from("documents")
+      .getPublicUrl(filename);
+
+    const publicUrl = data.publicUrl;
+
+    // ===============================
+    // Update Database
     // ===============================
     db.prepare(`
       UPDATE shipments
@@ -55,7 +67,7 @@ export async function POST(req: Request) {
         pdf_status = ?
       WHERE bl_number = ?
     `).run(
-      filename,
+      publicUrl,
       now.toISOString(),
       "UNDER REVIEW",
       bl
@@ -63,8 +75,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      filename,
-      url: `/uploads/import-documents/${filename}`,
+      url: publicUrl,
       status: "UNDER REVIEW",
     });
 
