@@ -7,15 +7,16 @@ export async function POST(req: Request) {
     const formData = await req.formData();
 
     const file = formData.get("file") as File | null;
-    const bl = formData.get("bl") as string | null;
+    const blRaw = formData.get("bl") as string | null;
 
-    if (!file || !bl) {
+    if (!file || !blRaw) {
       return NextResponse.json(
         { error: "Missing file or BL number" },
         { status: 400 }
       );
     }
 
+    const bl = blRaw.trim().toUpperCase();
     const now = new Date();
 
     const timestamp = now
@@ -28,9 +29,7 @@ export async function POST(req: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // ===============================
-    // Upload to Supabase Storage
-    // ===============================
+    // Upload to Supabase
     const { error } = await supabase.storage
       .from("documents")
       .upload(filename, buffer, {
@@ -46,18 +45,22 @@ export async function POST(req: Request) {
       );
     }
 
-    // ===============================
-    // Update Database (STORE FILENAME ONLY)
-    // ===============================
+    const { data } = supabase.storage
+      .from("documents")
+      .getPublicUrl(filename);
+
+    const publicUrl = data.publicUrl;
+
+    // 🔥 IMPORTANT FIX: case-insensitive update
     db.prepare(`
       UPDATE shipments
       SET
         pdf_filename = ?,
         pdf_uploaded_at = ?,
         pdf_status = ?
-      WHERE bl_number = ?
+      WHERE LOWER(bl_number) = LOWER(?)
     `).run(
-      filename,               // ✅ ONLY filename
+      publicUrl,
       now.toISOString(),
       "UNDER REVIEW",
       bl
@@ -65,7 +68,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      filename,
+      url: publicUrl,
       status: "UNDER REVIEW",
     });
 
