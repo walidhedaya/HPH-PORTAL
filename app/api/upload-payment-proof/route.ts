@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import db from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
-
     const file = formData.get("file") as File | null;
     const bl = formData.get("bl") as string | null;
 
@@ -17,20 +15,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // ===============================
-    // SAVE IN: public/uploads/payments
-    // ===============================
-    const paymentsDir = path.join(
-      process.cwd(),
-      "public",
-      "uploads",
-      "payments"
-    );
-
-    if (!fs.existsSync(paymentsDir)) {
-      fs.mkdirSync(paymentsDir, { recursive: true });
-    }
-
     const now = new Date();
     const timestamp = now
       .toISOString()
@@ -38,31 +22,60 @@ export async function POST(req: Request) {
       .replace("T", "_")
       .split(".")[0];
 
+    // ===============================
+    // FILE NAME + STORAGE PATH
+    // documents/payment/
+    // ===============================
     const filename = `PAYMENT_${bl}_${timestamp}.pdf`;
-    const filePath = path.join(paymentsDir, filename);
+    const storagePath = `payment/${filename}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(filePath, buffer);
 
     // ===============================
-    // UPDATE DATABASE
+    // UPLOAD TO SUPABASE STORAGE
+    // ===============================
+    const { error } = await supabase.storage
+      .from("documents")
+      .upload(storagePath, buffer, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Supabase upload error:", error);
+      return NextResponse.json(
+        { error: "Upload failed" },
+        { status: 500 }
+      );
+    }
+
+    // ===============================
+    // GET PUBLIC URL
+    // ===============================
+    const { data } = supabase.storage
+      .from("documents")
+      .getPublicUrl(storagePath);
+
+    const publicUrl = data.publicUrl;
+
+    // ===============================
+    // UPDATE DATABASE (CASE SAFE)
     // ===============================
     db.prepare(`
       UPDATE shipments
       SET
         payment_proof_filename = ?,
         payment_uploaded_at = ?
-      WHERE bl_number = ?
+      WHERE LOWER(bl_number) = LOWER(?)
     `).run(
-      filename,
+      publicUrl,
       now.toISOString(),
       bl
     );
 
     return NextResponse.json({
       success: true,
-      filename,
-      url: `/uploads/payments/${filename}`,
+      url: publicUrl,
     });
 
   } catch (err) {
