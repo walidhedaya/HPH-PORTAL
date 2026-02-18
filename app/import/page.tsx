@@ -151,9 +151,13 @@ export default function ImportPage() {
     );
   }
 
+  function openFile(url?: string | null) {
+    if (!url) return;
+    window.open(url, "_blank");
+  }
+
   return (
     <div className="page-bg">
-
       <div className="lang-switch">
         <button
           className={lang === "en" ? "active" : ""}
@@ -256,10 +260,7 @@ export default function ImportPage() {
                 className={btnClass(!!shipment.draft_invoice_filename)}
                 disabled={!shipment.draft_invoice_filename}
                 onClick={() =>
-                  window.open(
-                    `/uploads/draft/${shipment.draft_invoice_filename}`,
-                    "_blank"
-                  )
+                  openFile(shipment.draft_invoice_filename)
                 }
               >
                 {t.draft}
@@ -293,10 +294,7 @@ export default function ImportPage() {
                 className={btnClass(!!shipment.final_invoice_filename)}
                 disabled={!shipment.final_invoice_filename}
                 onClick={() =>
-                  window.open(
-                    `/uploads/final/${shipment.final_invoice_filename}`,
-                    "_blank"
-                  )
+                  openFile(shipment.final_invoice_filename)
                 }
               >
                 {t.final}
@@ -310,10 +308,7 @@ export default function ImportPage() {
                 className={btnClass(!!shipment.gate_pass_filename)}
                 disabled={!shipment.gate_pass_filename}
                 onClick={() =>
-                  window.open(
-                    `/uploads/gates/${shipment.gate_pass_filename}`,
-                    "_blank"
-                  )
+                  openFile(shipment.gate_pass_filename)
                 }
               >
                 {t.gate}
