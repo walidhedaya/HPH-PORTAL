@@ -123,7 +123,7 @@ export default function AdminExportDetailsPage() {
               disabled={!shipment.export_docs_filename}
               onClick={() =>
                 window.open(
-                  `/uploads/export-documents/${shipment.export_docs_filename}`,
+                  shipment.export_docs_filename!,   // 🔥 SUPABASE URL
                   "_blank"
                 )
               }
@@ -163,7 +163,7 @@ export default function AdminExportDetailsPage() {
               disabled={!shipment.payment_proof_filename}
               onClick={() =>
                 window.open(
-                  `/uploads/export-payments/${shipment.payment_proof_filename}`,
+                  shipment.payment_proof_filename!,  // 🔥 SUPABASE URL
                   "_blank"
                 )
               }
