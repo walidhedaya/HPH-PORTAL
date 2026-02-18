@@ -179,7 +179,7 @@ export default function ExportEntryPage() {
                 disabled={!shipment.draft_invoice_filename}
                 onClick={() =>
                   window.open(
-                    `/uploads/export-draft/${shipment.draft_invoice_filename}`,
+                    shipment.draft_invoice_filename!,
                     "_blank"
                   )
                 }
@@ -231,7 +231,7 @@ export default function ExportEntryPage() {
                 disabled={!shipment.final_invoice_filename}
                 onClick={() =>
                   window.open(
-                    `/uploads/export-final/${shipment.final_invoice_filename}`,
+                    shipment.final_invoice_filename!,
                     "_blank"
                   )
                 }
@@ -253,7 +253,7 @@ export default function ExportEntryPage() {
                 disabled={!shipment.gate_pass_filename}
                 onClick={() =>
                   window.open(
-                    `/uploads/export-gates/${shipment.gate_pass_filename}`,
+                    shipment.gate_pass_filename!,
                     "_blank"
                   )
                 }
