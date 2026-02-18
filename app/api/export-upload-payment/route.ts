@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
-import path from "path";
-import fs from "fs";
+import { supabase } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,34 +16,66 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Ensure upload folder exists
-    const uploadDir = path.join(
-      process.cwd(),
-      "public/uploads/export-payments"
-    );
+    const now = new Date();
+    const timestamp = now
+      .toISOString()
+      .replace(/:/g, "-")
+      .replace("T", "_")
+      .split(".")[0];
 
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    // Create unique filename
-    const fileName = `${booking}_${Date.now()}.pdf`;
-    const filePath = path.join(uploadDir, fileName);
+    // ===============================
+    // Storage path
+    // documents/export-payments/
+    // ===============================
+    const fileName = `PAYMENT_${booking}_${timestamp}.pdf`;
+    const storagePath = `export-payments/${fileName}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(filePath, buffer);
 
-    // Update DB
+    // ===============================
+    // Upload to Supabase
+    // ===============================
+    const { error } = await supabase.storage
+      .from("documents")
+      .upload(storagePath, buffer, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Supabase upload error:", error);
+      return NextResponse.json(
+        { success: false, message: "Upload failed" },
+        { status: 500 }
+      );
+    }
+
+    // ===============================
+    // Get Public URL
+    // ===============================
+    const { data } = supabase.storage
+      .from("documents")
+      .getPublicUrl(storagePath);
+
+    const publicUrl = data.publicUrl;
+
+    // ===============================
+    // Update DB (case safe)
+    // ===============================
     db.prepare(`
       UPDATE export_shipments
       SET 
         payment_proof_filename = ?,
-        payment_uploaded_at = datetime('now')
-      WHERE booking_number = ?
-    `).run(fileName, booking);
+        payment_uploaded_at = ?
+      WHERE LOWER(booking_number) = LOWER(?)
+    `).run(
+      publicUrl,
+      now.toISOString(),
+      booking
+    );
 
     const updated = db
-      .prepare(`SELECT * FROM export_shipments WHERE booking_number = ?`)
+      .prepare(`SELECT * FROM export_shipments WHERE LOWER(booking_number) = LOWER(?)`)
       .get(booking);
 
     return NextResponse.json({
