@@ -121,12 +121,7 @@ export default function AdminExportDetailsPage() {
             <button
               className={btnClass(!!shipment.export_docs_filename, !!shipment.export_docs_filename)}
               disabled={!shipment.export_docs_filename}
-              onClick={() =>
-                window.open(
-                  shipment.export_docs_filename!,   // 🔥 SUPABASE URL
-                  "_blank"
-                )
-              }
+              onClick={() => window.open(shipment.export_docs_filename!, "_blank")}
             >
               {shipment.export_docs_filename
                 ? "Documents Downloaded"
@@ -153,6 +148,17 @@ export default function AdminExportDetailsPage() {
                 ? "Draft Uploaded"
                 : "Upload Draft"}
             </button>
+
+            {shipment.draft_invoice_filename && (
+              <button
+                style={{ marginTop: 10 }}
+                onClick={() =>
+                  window.open(shipment.draft_invoice_filename!, "_blank")
+                }
+              >
+                Download Draft
+              </button>
+            )}
           </div>
 
           {/* Payment */}
@@ -162,10 +168,7 @@ export default function AdminExportDetailsPage() {
               className={btnClass(!!shipment.payment_proof_filename, !!shipment.payment_proof_filename)}
               disabled={!shipment.payment_proof_filename}
               onClick={() =>
-                window.open(
-                  shipment.payment_proof_filename!,  // 🔥 SUPABASE URL
-                  "_blank"
-                )
+                window.open(shipment.payment_proof_filename!, "_blank")
               }
             >
               {shipment.payment_proof_filename
@@ -193,6 +196,17 @@ export default function AdminExportDetailsPage() {
                 ? "Final Uploaded"
                 : "Upload Final"}
             </button>
+
+            {shipment.final_invoice_filename && (
+              <button
+                style={{ marginTop: 10 }}
+                onClick={() =>
+                  window.open(shipment.final_invoice_filename!, "_blank")
+                }
+              >
+                Download Final
+              </button>
+            )}
           </div>
 
           {/* Gate */}
@@ -214,6 +228,17 @@ export default function AdminExportDetailsPage() {
                 ? "Gate Uploaded"
                 : "Upload Gate"}
             </button>
+
+            {shipment.gate_pass_filename && (
+              <button
+                style={{ marginTop: 10 }}
+                onClick={() =>
+                  window.open(shipment.gate_pass_filename!, "_blank")
+                }
+              >
+                Download Gate
+              </button>
+            )}
           </div>
 
           {/* Appointment */}
