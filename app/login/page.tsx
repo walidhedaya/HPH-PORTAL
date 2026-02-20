@@ -20,12 +20,6 @@ const translations = {
   },
 };
 
-// 🔐 Credentials (DEV ONLY)
-const USERS = [
-  { username: "admin", password: "Admin@123", role: "admin" },
-  { username: "user", password: "User@123", role: "user" },
-];
-
 export default function LoginPage() {
   const router = useRouter();
   const [lang, setLang] = useState<"en" | "ar">("ar");
@@ -46,27 +40,36 @@ export default function LoginPage() {
     document.head.appendChild(style);
   }, []);
 
-  const handleLogin = () => {
-    const user = USERS.find(
-      (u) => u.username === username && u.password === password
-    );
+  const handleLogin = async () => {
+    setError("");
 
-    if (!user) {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tax_id: username,
+        password,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
       setError(t.error);
       return;
     }
 
-    // ✅ Save session
-    localStorage.setItem("username", user.username);
-    localStorage.setItem("role", user.role);
+    // Save session
+    localStorage.setItem("tax_id", data.tax_id);
+    localStorage.setItem("role", data.role);
 
-    // 👉 Go to Select Terminal
     router.push("/select-terminal");
   };
 
   return (
     <div className="page-bg">
-      {/* Language */}
       <div className="lang-switch">
         <button
           className={lang === "en" ? "active" : ""}

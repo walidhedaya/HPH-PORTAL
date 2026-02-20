@@ -4,19 +4,29 @@ import db from "@/lib/db";
 
 export async function POST(req: Request) {
   try {
-    const { tax_id, password } = await req.json();
+    const { tax_id, password, role } = await req.json();
 
-    if (!tax_id || !password) {
+    const cleanTaxId = String(tax_id).trim();
+
+    if (!cleanTaxId || !password || !role) {
       return NextResponse.json(
-        { error: "Missing tax_id or password" },
+        { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    // تحقق إن المستخدم مش موجود
+    // Validate role
+    if (role !== "admin" && role !== "user") {
+      return NextResponse.json(
+        { error: "Invalid role value" },
+        { status: 400 }
+      );
+    }
+
+    // Check if user exists
     const existing = db
       .prepare(`SELECT id FROM users WHERE tax_id = ?`)
-      .get(tax_id);
+      .get(cleanTaxId);
 
     if (existing) {
       return NextResponse.json(
@@ -25,20 +35,22 @@ export async function POST(req: Request) {
       );
     }
 
-    // تشفير كلمة المرور
+    // Hash password
     const hash = await bcrypt.hash(password, 10);
 
+    // Insert user with selected role
     db.prepare(`
-      INSERT INTO users (tax_id, password_hash, role, created_at)
+      INSERT INTO users (tax_id, password, role, created_at)
       VALUES (?, ?, ?, ?)
     `).run(
-      tax_id,
+      cleanTaxId,
       hash,
-      "user",
+      role,
       new Date().toISOString()
     );
 
     return NextResponse.json({ success: true });
+
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message },

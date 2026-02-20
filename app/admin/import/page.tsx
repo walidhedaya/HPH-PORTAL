@@ -34,6 +34,7 @@ export default function AdminImportPage() {
   const [taxId, setTaxId] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [role, setRole] = useState<"user" | "admin">("user");
   const [userMsg, setUserMsg] = useState<string | null>(null);
 
   const terminal =
@@ -125,7 +126,6 @@ export default function AdminImportPage() {
       setMessage("Excel uploaded successfully");
       setExcelFile(null);
 
-      // reload queue
       if (terminal) {
         const qRes = await fetch(`/api/admin-queue?terminal=${terminal}`);
         const qData = await qRes.json();
@@ -159,9 +159,9 @@ export default function AdminImportPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        tax_id: taxId,
+        tax_id: taxId.trim(),
         password,
-        role: "user",
+        role,
       }),
     });
 
@@ -176,6 +176,7 @@ export default function AdminImportPage() {
     setTaxId("");
     setPassword("");
     setConfirm("");
+    setRole("user");
   };
 
   return (
@@ -186,9 +187,9 @@ export default function AdminImportPage() {
           Admin Control Panel
         </h2>
 
-        {/* ===== TOP CARDS ===== */}
         <div className="admin-grid">
 
+          {/* Upload BL */}
           <div className="mini-card">
             <h4>Upload BL Excel</h4>
             <input
@@ -206,6 +207,7 @@ export default function AdminImportPage() {
             )}
           </div>
 
+          {/* Search */}
           <div className="mini-card">
             <h4>Search BL</h4>
             <input
@@ -223,28 +225,46 @@ export default function AdminImportPage() {
             )}
           </div>
 
+          {/* Create User */}
           <div className="mini-card">
             <h4>Create User</h4>
+
             <input
               placeholder="Tax ID"
               value={taxId}
               onChange={e => setTaxId(e.target.value)}
             />
+
             <input
               type="password"
               placeholder="Password"
               value={password}
               onChange={e => setPassword(e.target.value)}
             />
+
             <input
               type="password"
               placeholder="Confirm Password"
               value={confirm}
               onChange={e => setConfirm(e.target.value)}
             />
+
+            {/* Role Selector */}
+            <select
+              value={role}
+              onChange={e =>
+                setRole(e.target.value as "admin" | "user")
+              }
+              style={{ marginBottom: "10px" }}
+            >
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+
             <button onClick={handleCreateUser}>
               Create User
             </button>
+
             {userMsg && (
               <p style={{ marginTop: 10, fontSize: 14 }}>
                 {userMsg}
@@ -254,7 +274,7 @@ export default function AdminImportPage() {
 
         </div>
 
-        {/* ===== QUEUE TABLE ===== */}
+        {/* Queue Table */}
         <div style={{ marginTop: "40px" }}>
           <h3 style={{ marginBottom: "15px" }}>
             Processing Queue ({terminal})

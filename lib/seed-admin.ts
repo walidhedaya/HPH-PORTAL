@@ -7,7 +7,7 @@ const ADMIN_PASSWORD = "admin123";
 const hash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
 
 const exists = db
-  .prepare(`SELECT id FROM users WHERE tax_id = ?`)
+  .prepare(`SELECT * FROM users WHERE tax_id = ?`)
   .get(ADMIN_TAX_ID);
 
 if (!exists) {
@@ -23,5 +23,21 @@ if (!exists) {
 
   console.log("✅ Admin created");
 } else {
-  console.log("ℹ️ Admin already exists");
+  db.prepare(`
+    UPDATE users
+    SET password = ?, role = ?
+    WHERE tax_id = ?
+  `).run(hash, "admin", ADMIN_TAX_ID);
+
+  console.log("🔄 Admin password reset");
+
+  const updated = db
+    .prepare(`SELECT * FROM users WHERE tax_id = ?`)
+    .get(ADMIN_TAX_ID);
+
+  console.log("Stored hash:", updated.password);
 }
+
+console.log("Test compare result:",
+  bcrypt.compareSync("admin123", hash)
+);
