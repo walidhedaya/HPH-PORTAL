@@ -30,10 +30,11 @@ const translations = {
     required: "Required Documents",
     remark: "Remark: upload PDF only",
     docs:
-      "Delivery Order - Shipping Line Release Letter - Stamped Bill of Lading",
+      "Delivery Order - Shipping Line Release Letter - Stamped Bill of Lading - Final Customs Release",
     notFound: "BL not found for selected terminal",
     underReview: "Documents Under Review",
-    approved: "Documents Approved",
+    approved:
+      "Approved – Please wait for draft invoice",
     needMore: "More Documents Required",
   },
   ar: {
@@ -48,10 +49,11 @@ const translations = {
     required: "المستندات المطلوبة",
     remark: "ملاحظة: يتم رفع ملفات PDF فقط",
     docs:
-      "إذن التسليم - خطاب الإفراج من الخط الملاحي - بوليصة الشحن مختومة",
+      "إذن التسليم - خطاب الإفراج من الخط الملاحي - بوليصة الشحن مختومة - الإفراج الجمركى النهائى",
     notFound: "البوليصة غير موجودة في المحطة المختارة",
     underReview: "المستندات قيد المراجعة",
-    approved: "تم اعتماد المستندات",
+    approved:
+      "تم اعتماد المستندات – برجاء انتظار الفاتورة المبدئية",
     needMore: "مطلوب مستندات إضافية",
   },
 };
@@ -69,7 +71,6 @@ export default function ImportPage() {
       typeof window !== "undefined"
         ? localStorage.getItem("lang")
         : "en";
-
     if (savedLang === "ar") setLang("ar");
   }, []);
 
@@ -142,15 +143,6 @@ export default function ImportPage() {
     return active ? "btn-active" : "btn-disabled";
   }
 
-  function showRequiredCard() {
-    if (!shipment) return false;
-
-    return (
-      !shipment.pdf_filename ||
-      shipment.pdf_status === "NEED MORE DOCS"
-    );
-  }
-
   function openFile(url?: string | null) {
     if (!url) return;
     window.open(url, "_blank");
@@ -192,144 +184,184 @@ export default function ImportPage() {
           {t.search}
         </button>
 
-        {shipment && showRequiredCard() && (
-          <div className="mini-card" style={{ marginBottom: 20 }}>
-            <h4>{t.required}</h4>
-            <p>{t.docs}</p>
-            <p style={{ color: "#c0392b", marginTop: 10 }}>
-              {t.remark}
-            </p>
-
-            {shipment.pdf_status === "UNDER REVIEW" && (
-              <p style={{ color: "#b58900", marginTop: 15 }}>
-                🕒 {t.underReview}
-              </p>
-            )}
-
-            {shipment.pdf_status === "NEED MORE DOCS" && (
-              <>
-                <p style={{ color: "#c0392b", marginTop: 15 }}>
-                  ❗ {t.needMore}
-                </p>
-                {shipment.admin_comment && (
-                  <p style={{ marginTop: 8 }}>
-                    <strong>Admin:</strong>{" "}
-                    {shipment.admin_comment}
-                  </p>
-                )}
-              </>
-            )}
-
-            {shipment.pdf_status === "APPROVED" && (
-              <p style={{ color: "green", marginTop: 15 }}>
-                ✔ {t.approved}
-              </p>
-            )}
-          </div>
-        )}
-
         {shipment && (
-          <div className="admin-grid">
+          <>
+            {/* Required Documents */}
+            <div className="mini-card" style={{ marginBottom: 20 }}>
+              <h4>{t.required}</h4>
+              <p>{t.docs}</p>
+              <p style={{ color: "#c0392b", marginTop: 10 }}>
+                {t.remark}
+              </p>
 
-            {/* Upload Docs */}
-            <div className="mini-card">
-              <h4>{t.uploadPDF}</h4>
-              <input
-                type="file"
-                accept="application/pdf"
-                disabled={shipment.pdf_status === "UNDER REVIEW"}
-                onChange={(e) =>
-                  setPdfFile(e.target.files?.[0] || null)
-                }
-              />
-              <button
-                className={btnClass(
-                  shipment.pdf_status !== "UNDER REVIEW"
+              {shipment.pdf_status === "UNDER REVIEW" && (
+                <p style={{ color: "#b58900", marginTop: 15 }}>
+                  🕒 {t.underReview}
+                </p>
+              )}
+
+              {shipment.pdf_status === "NEED MORE DOCS" && (
+                <>
+                  <p style={{ color: "#c0392b", marginTop: 15 }}>
+                    ❗ {t.needMore}
+                  </p>
+                  {shipment.admin_comment && (
+                    <p style={{ marginTop: 8 }}>
+                      <strong>Admin:</strong>{" "}
+                      {shipment.admin_comment}
+                    </p>
+                  )}
+                </>
+              )}
+
+              {shipment.pdf_status === "APPROVED" && (
+                <p style={{ color: "green", marginTop: 15 }}>
+                  ✔ {t.approved}
+                </p>
+              )}
+            </div>
+
+            <div className="admin-grid">
+
+              {/* Upload Documents */}
+              <div className="mini-card">
+                <h4>{t.uploadPDF}</h4>
+
+                {shipment.pdf_filename ? (
+                  <button className="btn-disabled" disabled>
+                    Documents Uploaded ✔
+                  </button>
+                ) : (
+                  <>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      onChange={(e) =>
+                        setPdfFile(e.target.files?.[0] || null)
+                      }
+                    />
+                    <button
+                      className="btn-active"
+                      onClick={uploadPDF}
+                    >
+                      {t.uploadPDF}
+                    </button>
+                  </>
                 )}
-                disabled={shipment.pdf_status === "UNDER REVIEW"}
-                onClick={uploadPDF}
-              >
-                {t.uploadPDF}
-              </button>
-            </div>
+              </div>
 
-            {/* Draft */}
-            <div className="mini-card">
-              <h4>{t.draft}</h4>
-              <button
-                className={btnClass(!!shipment.draft_invoice_filename)}
-                disabled={!shipment.draft_invoice_filename}
-                onClick={() =>
-                  openFile(shipment.draft_invoice_filename)
-                }
-              >
-                {t.draft}
-              </button>
-            </div>
+              {/* Draft */}
+              <div className="mini-card">
+                <h4>{t.draft}</h4>
+                <button
+                  className={btnClass(
+                    !!shipment.draft_invoice_filename
+                  )}
+                  disabled={!shipment.draft_invoice_filename}
+                  onClick={() =>
+                    openFile(shipment.draft_invoice_filename)
+                  }
+                >
+                  {shipment.draft_invoice_filename
+                    ? t.draft
+                    : "Waiting for Draft"}
+                </button>
+              </div>
 
-            {/* Payment */}
-            <div className="mini-card">
-              <h4>{t.uploadPayment}</h4>
-              <input
-                type="file"
-                accept="application/pdf"
-                disabled={!shipment.draft_invoice_filename}
-                onChange={(e) =>
-                  setPaymentFile(e.target.files?.[0] || null)
-                }
-              />
-              <button
-                className={btnClass(!!shipment.draft_invoice_filename)}
-                disabled={!shipment.draft_invoice_filename}
-                onClick={uploadPaymentProof}
-              >
-                {t.uploadPayment}
-              </button>
-            </div>
+              {/* Payment */}
+              <div className="mini-card">
+                <h4>{t.uploadPayment}</h4>
 
-            {/* Final */}
-            <div className="mini-card">
-              <h4>{t.final}</h4>
-              <button
-                className={btnClass(!!shipment.final_invoice_filename)}
-                disabled={!shipment.final_invoice_filename}
-                onClick={() =>
-                  openFile(shipment.final_invoice_filename)
-                }
-              >
-                {t.final}
-              </button>
-            </div>
+                {shipment.payment_proof_filename ? (
+                  <button className="btn-disabled" disabled>
+                    Payment Uploaded ✔
+                  </button>
+                ) : (
+                  <>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      disabled={
+                        !shipment.draft_invoice_filename
+                      }
+                      onChange={(e) =>
+                        setPaymentFile(
+                          e.target.files?.[0] || null
+                        )
+                      }
+                    />
+                    <button
+                      className={btnClass(
+                        !!shipment.draft_invoice_filename
+                      )}
+                      disabled={
+                        !shipment.draft_invoice_filename
+                      }
+                      onClick={uploadPaymentProof}
+                    >
+                      {t.uploadPayment}
+                    </button>
+                  </>
+                )}
+              </div>
 
-            {/* Gate */}
-            <div className="mini-card">
-              <h4>{t.gate}</h4>
-              <button
-                className={btnClass(!!shipment.gate_pass_filename)}
-                disabled={!shipment.gate_pass_filename}
-                onClick={() =>
-                  openFile(shipment.gate_pass_filename)
-                }
-              >
-                {t.gate}
-              </button>
-            </div>
+              {/* Final */}
+              <div className="mini-card">
+                <h4>{t.final}</h4>
+                <button
+                  className={btnClass(
+                    !!shipment.final_invoice_filename
+                  )}
+                  disabled={!shipment.final_invoice_filename}
+                  onClick={() =>
+                    openFile(shipment.final_invoice_filename)
+                  }
+                >
+                  {shipment.final_invoice_filename
+                    ? t.final
+                    : "Waiting for Final"}
+                </button>
+              </div>
 
-            {/* Appointment */}
-            <div className="mini-card">
-              <h4>{t.appointment}</h4>
-              <button
-                className={btnClass(!!shipment.gate_pass_filename)}
-                disabled={!shipment.gate_pass_filename}
-                onClick={() =>
-                  window.open("https://appointment-link.com", "_blank")
-                }
-              >
-                {t.appointment}
-              </button>
-            </div>
+              {/* Gate */}
+              <div className="mini-card">
+                <h4>{t.gate}</h4>
+                <button
+                  className={btnClass(
+                    !!shipment.gate_pass_filename
+                  )}
+                  disabled={!shipment.gate_pass_filename}
+                  onClick={() =>
+                    openFile(shipment.gate_pass_filename)
+                  }
+                >
+                  {shipment.gate_pass_filename
+                    ? t.gate
+                    : "Waiting for Gate"}
+                </button>
+              </div>
 
-          </div>
+              {/* Appointment */}
+              <div className="mini-card">
+                <h4>{t.appointment}</h4>
+                <button
+                  className={btnClass(
+                    !!shipment.gate_pass_filename
+                  )}
+                  disabled={!shipment.gate_pass_filename}
+                  onClick={() =>
+                    window.open(
+                      "https://play.google.com/store/apps/details?id=com.hph.odt.stacks",
+                      "_blank"
+                    )
+                  }
+                >
+                  {t.appointment}
+                </button>
+              </div>
+
+            </div>
+          </>
         )}
 
         {message && <p style={{ marginTop: 15 }}>{message}</p>}

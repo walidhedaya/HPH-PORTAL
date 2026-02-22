@@ -20,26 +20,31 @@ export async function POST(req: Request) {
     }
 
     const now = new Date().toISOString();
+    const cleanBl = String(bl).trim().toUpperCase();
 
-    const result = db
-      .prepare(`
-        UPDATE shipments
-        SET
-          pdf_status = ?,
-          admin_comment = ?,
-          reviewed_at = ?,
-          handling_admin = ?
-        WHERE bl_number = ?
-      `)
-      .run(
+    // ===============================
+    // UPDATE (Postgres)
+    // ===============================
+    const result = await db.query(
+      `
+      UPDATE shipments
+      SET
+        pdf_status = $1,
+        admin_comment = $2,
+        reviewed_at = $3,
+        handling_admin = $4
+      WHERE LOWER(bl_number) = LOWER($5)
+      `,
+      [
         status,
         comment || null,
         now,
         admin || "Unknown Admin",
-        bl
-      );
+        cleanBl
+      ]
+    );
 
-    if (result.changes === 0) {
+    if (result.rowCount === 0) {
       return NextResponse.json(
         { error: "BL not found" },
         { status: 404 }
@@ -48,9 +53,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      bl,
+      bl: cleanBl,
       status,
     });
+
   } catch (err) {
     console.error("Review BL error:", err);
     return NextResponse.json(

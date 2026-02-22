@@ -8,7 +8,10 @@ export async function POST(req: Request) {
     const file = formData.get("file") as File;
 
     if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No file uploaded" },
+        { status: 400 }
+      );
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -16,29 +19,31 @@ export async function POST(req: Request) {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json<any>(sheet);
 
-    const insert = db.prepare(`
-      INSERT INTO shipments
-      (bl_number, tax_id, terminal, consignee, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
     const now = new Date().toISOString();
 
     for (const row of rows) {
       if (!row.bl_number || !row.tax_id || !row.terminal) continue;
 
-      insert.run(
-        String(row.bl_number).trim(),
-        String(row.tax_id).trim(),
-        String(row.terminal).trim(),
-        row.consignee ? String(row.consignee).trim() : "",
-        row.status ? String(row.status).trim() : "Open",
-        now
+      await db.query(
+        `
+        INSERT INTO shipments
+        (bl_number, tax_id, terminal, consignee, status, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        `,
+        [
+          String(row.bl_number).trim(),
+          String(row.tax_id).trim(),
+          String(row.terminal).trim(),
+          row.consignee ? String(row.consignee).trim() : "",
+          row.status ? String(row.status).trim() : "Open",
+          now,
+        ]
       );
     }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
+    console.error("UPLOAD BL ERROR:", err);
     return NextResponse.json(
       { error: err.message },
       { status: 500 }

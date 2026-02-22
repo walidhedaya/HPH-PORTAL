@@ -3,7 +3,7 @@ import db from "@/lib/db";
 
 export async function GET() {
   try {
-    const rows = db.prepare(`
+    const { rows } = await db.query(`
       SELECT
         bl_number,
         tax_id,
@@ -14,7 +14,7 @@ export async function GET() {
       FROM shipments
       WHERE pdf_status = 'UNDER REVIEW'
       ORDER BY pdf_uploaded_at DESC
-    `).all();
+    `);
 
     return NextResponse.json({
       success: true,

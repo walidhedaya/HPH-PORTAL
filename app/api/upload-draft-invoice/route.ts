@@ -26,15 +26,16 @@ export async function POST(req: Request) {
       .split(".")[0];
 
     const filename = `DRAFT_${bl}_${timestamp}.pdf`;
+    const storagePath = `draft/${filename}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
     // ===============================
-    // Upload to Supabase Storage
+    // Upload to Supabase
     // ===============================
     const { error } = await supabase.storage
       .from("documents")
-      .upload(`draft/${filename}`, buffer, {
+      .upload(storagePath, buffer, {
         contentType: "application/pdf",
         upsert: true,
       });
@@ -49,23 +50,26 @@ export async function POST(req: Request) {
 
     const { data } = supabase.storage
       .from("documents")
-      .getPublicUrl(`draft/${filename}`);
+      .getPublicUrl(storagePath);
 
     const publicUrl = data.publicUrl;
 
     // ===============================
-    // Update DB (case insensitive)
+    // UPDATE (Postgres)
     // ===============================
-    db.prepare(`
+    await db.query(
+      `
       UPDATE shipments
       SET
-        draft_invoice_filename = ?,
-        draft_invoice_uploaded_at = ?
-      WHERE LOWER(bl_number) = LOWER(?)
-    `).run(
-      publicUrl,
-      now.toISOString(),
-      bl
+        draft_invoice_filename = $1,
+        draft_invoice_uploaded_at = $2
+      WHERE LOWER(bl_number) = LOWER($3)
+      `,
+      [
+        publicUrl,
+        now.toISOString(),
+        bl
+      ]
     );
 
     return NextResponse.json({

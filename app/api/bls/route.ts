@@ -5,16 +5,16 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const rows = db
-      .prepare(`SELECT * FROM shipments ORDER BY created_at DESC`)
-      .all();
+    const { rows } = await db.query(
+      `SELECT * FROM shipments ORDER BY created_at DESC`
+    );
 
     return NextResponse.json({
       success: true,
       data: rows,
     });
   } catch (err: any) {
-    console.error(err);
+    console.error("BLS ERROR:", err);
     return NextResponse.json(
       { success: false, error: err.message },
       { status: 500 }

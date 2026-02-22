@@ -7,12 +7,6 @@ type LoginBody = {
   password: string;
 };
 
-type User = {
-  tax_id: string;
-  password: string;
-  role: string;
-};
-
 export async function POST(req: Request) {
   try {
     const body: LoginBody = await req.json();
@@ -27,9 +21,12 @@ export async function POST(req: Request) {
       );
     }
 
-    const user = db
-      .prepare("SELECT * FROM users WHERE tax_id = ?")
-      .get(tax_id) as User | undefined;
+    const result = await db.query(
+      "SELECT * FROM users WHERE tax_id = $1",
+      [tax_id]
+    );
+
+    const user = result.rows[0];
 
     if (!user) {
       return NextResponse.json(
@@ -38,7 +35,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const valid = bcrypt.compareSync(password, user.password);
+    const valid = await bcrypt.compare(password, user.password);
 
     if (!valid) {
       return NextResponse.json(

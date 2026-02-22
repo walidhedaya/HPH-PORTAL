@@ -23,18 +23,11 @@ export async function POST(req: NextRequest) {
       .replace("T", "_")
       .split(".")[0];
 
-    // ===============================
-    // Storage path
-    // documents/export-payments/
-    // ===============================
     const fileName = `PAYMENT_${booking}_${timestamp}.pdf`;
     const storagePath = `export-payments/${fileName}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // ===============================
-    // Upload to Supabase
-    // ===============================
     const { error } = await supabase.storage
       .from("documents")
       .upload(storagePath, buffer, {
@@ -50,9 +43,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===============================
-    // Get Public URL
-    // ===============================
     const { data } = supabase.storage
       .from("documents")
       .getPublicUrl(storagePath);
@@ -60,27 +50,37 @@ export async function POST(req: NextRequest) {
     const publicUrl = data.publicUrl;
 
     // ===============================
-    // Update DB (case safe)
+    // UPDATE (Postgres)
     // ===============================
-    db.prepare(`
+    await db.query(
+      `
       UPDATE export_shipments
       SET 
-        payment_proof_filename = ?,
-        payment_uploaded_at = ?
-      WHERE LOWER(booking_number) = LOWER(?)
-    `).run(
-      publicUrl,
-      now.toISOString(),
-      booking
+        payment_proof_filename = $1,
+        payment_uploaded_at = $2
+      WHERE LOWER(booking_number) = LOWER($3)
+      `,
+      [
+        publicUrl,
+        now.toISOString(),
+        booking
+      ]
     );
 
-    const updated = db
-      .prepare(`SELECT * FROM export_shipments WHERE LOWER(booking_number) = LOWER(?)`)
-      .get(booking);
+    // ===============================
+    // SELECT updated row
+    // ===============================
+    const { rows } = await db.query(
+      `
+      SELECT * FROM export_shipments
+      WHERE LOWER(booking_number) = LOWER($1)
+      `,
+      [booking]
+    );
 
     return NextResponse.json({
       success: true,
-      data: updated,
+      data: rows[0] || null,
     });
 
   } catch (error) {

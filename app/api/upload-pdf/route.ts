@@ -29,7 +29,9 @@ export async function POST(req: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
+    // ===============================
     // Upload to Supabase
+    // ===============================
     const { error } = await supabase.storage
       .from("documents")
       .upload(filename, buffer, {
@@ -51,19 +53,24 @@ export async function POST(req: Request) {
 
     const publicUrl = data.publicUrl;
 
-    // 🔥 IMPORTANT FIX: case-insensitive update
-    db.prepare(`
+    // ===============================
+    // UPDATE (Postgres style)
+    // ===============================
+    await db.query(
+      `
       UPDATE shipments
       SET
-        pdf_filename = ?,
-        pdf_uploaded_at = ?,
-        pdf_status = ?
-      WHERE LOWER(bl_number) = LOWER(?)
-    `).run(
-      publicUrl,
-      now.toISOString(),
-      "UNDER REVIEW",
-      bl
+        pdf_filename = $1,
+        pdf_uploaded_at = $2,
+        pdf_status = $3
+      WHERE LOWER(bl_number) = LOWER($4)
+      `,
+      [
+        publicUrl,
+        now.toISOString(),
+        "UNDER REVIEW",
+        bl,
+      ]
     );
 
     return NextResponse.json({

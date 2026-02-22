@@ -6,34 +6,31 @@ export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
-    const bl = formData.get("bl") as string | null;
+    const blRaw = formData.get("bl") as string | null;
 
-    if (!file || !bl) {
+    if (!file || !blRaw) {
       return NextResponse.json(
         { error: "Missing file or BL number" },
         { status: 400 }
       );
     }
 
+    const bl = blRaw.trim().toUpperCase();
     const now = new Date();
+
     const timestamp = now
       .toISOString()
       .replace(/:/g, "-")
       .replace("T", "_")
       .split(".")[0];
 
-    // ===============================
-    // FILE NAME + PATH INSIDE BUCKET
-    // documents/final/
-    // ===============================
     const filename = `${bl}_FINAL_${timestamp}.pdf`;
     const filePath = `final/${filename}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
     // ===============================
-    // UPLOAD TO SUPABASE STORAGE
-    // Bucket: documents
+    // Upload to Supabase
     // ===============================
     const { error } = await supabase.storage
       .from("documents")
@@ -50,9 +47,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // ===============================
-    // GET PUBLIC URL
-    // ===============================
     const { data } = supabase.storage
       .from("documents")
       .getPublicUrl(filePath);
@@ -60,18 +54,21 @@ export async function POST(req: Request) {
     const publicUrl = data.publicUrl;
 
     // ===============================
-    // UPDATE DATABASE (Case Safe)
+    // UPDATE (Postgres)
     // ===============================
-    db.prepare(`
+    await db.query(
+      `
       UPDATE shipments
       SET
-        final_invoice_filename = ?,
-        final_invoice_uploaded_at = ?
-      WHERE LOWER(bl_number) = LOWER(?)
-    `).run(
-      publicUrl,
-      now.toISOString(),
-      bl
+        final_invoice_filename = $1,
+        final_invoice_uploaded_at = $2
+      WHERE LOWER(bl_number) = LOWER($3)
+      `,
+      [
+        publicUrl,
+        now.toISOString(),
+        bl
+      ]
     );
 
     return NextResponse.json({

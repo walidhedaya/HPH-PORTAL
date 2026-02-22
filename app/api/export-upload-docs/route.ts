@@ -26,10 +26,6 @@ export async function POST(req: NextRequest) {
       .replace("T", "_")
       .split(".")[0];
 
-    // ===============================
-    // Storage path inside bucket
-    // documents/export-documents/
-    // ===============================
     const fileName = `${booking}_${timestamp}.pdf`;
     const storagePath = `export-documents/${fileName}`;
 
@@ -53,9 +49,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===============================
-    // Get Public URL
-    // ===============================
     const { data } = supabase.storage
       .from("documents")
       .getPublicUrl(storagePath);
@@ -63,33 +56,43 @@ export async function POST(req: NextRequest) {
     const publicUrl = data.publicUrl;
 
     // ===============================
-    // Update Database
+    // UPDATE (PostgreSQL style)
     // ===============================
-    db.prepare(`
+    await db.query(
+      `
       UPDATE export_shipments
       SET 
-        export_docs_filename = ?,
-        export_docs_uploaded_at = ?,
-        stuffing = ?,
-        inspection = ?,
-        inspection_containers = ?
-      WHERE LOWER(booking_number) = LOWER(?)
-    `).run(
-      publicUrl,
-      now.toISOString(),
-      stuffing === "1" ? 1 : 0,
-      inspection === "1" ? 1 : 0,
-      Number(inspectionContainers || 0),
-      booking
+        export_docs_filename = $1,
+        export_docs_uploaded_at = $2,
+        stuffing = $3,
+        inspection = $4,
+        inspection_containers = $5
+      WHERE LOWER(booking_number) = LOWER($6)
+      `,
+      [
+        publicUrl,
+        now.toISOString(),
+        stuffing === "1" ? 1 : 0,
+        inspection === "1" ? 1 : 0,
+        Number(inspectionContainers || 0),
+        booking,
+      ]
     );
 
-    const updated = db
-      .prepare(`SELECT * FROM export_shipments WHERE LOWER(booking_number) = LOWER(?)`)
-      .get(booking);
+    // ===============================
+    // SELECT updated row
+    // ===============================
+    const { rows } = await db.query(
+      `
+      SELECT * FROM export_shipments
+      WHERE LOWER(booking_number) = LOWER($1)
+      `,
+      [booking]
+    );
 
     return NextResponse.json({
       success: true,
-      data: updated,
+      data: rows[0] || null,
     });
 
   } catch (error) {

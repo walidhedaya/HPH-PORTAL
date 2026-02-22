@@ -15,7 +15,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validate role
     if (role !== "admin" && role !== "user") {
       return NextResponse.json(
         { error: "Invalid role value" },
@@ -23,35 +22,46 @@ export async function POST(req: Request) {
       );
     }
 
+    // ===============================
     // Check if user exists
-    const existing = db
-      .prepare(`SELECT id FROM users WHERE tax_id = ?`)
-      .get(cleanTaxId);
+    // ===============================
+    const { rows: existing } = await db.query(
+      `SELECT id FROM users WHERE tax_id = $1`,
+      [cleanTaxId]
+    );
 
-    if (existing) {
+    if (existing.length > 0) {
       return NextResponse.json(
         { error: "User already exists" },
         { status: 400 }
       );
     }
 
+    // ===============================
     // Hash password
+    // ===============================
     const hash = await bcrypt.hash(password, 10);
 
-    // Insert user with selected role
-    db.prepare(`
+    // ===============================
+    // Insert user
+    // ===============================
+    await db.query(
+      `
       INSERT INTO users (tax_id, password, role, created_at)
-      VALUES (?, ?, ?, ?)
-    `).run(
-      cleanTaxId,
-      hash,
-      role,
-      new Date().toISOString()
+      VALUES ($1, $2, $3, $4)
+      `,
+      [
+        cleanTaxId,
+        hash,
+        role,
+        new Date().toISOString(),
+      ]
     );
 
     return NextResponse.json({ success: true });
 
   } catch (err: any) {
+    console.error(err);
     return NextResponse.json(
       { error: err.message },
       { status: 500 }

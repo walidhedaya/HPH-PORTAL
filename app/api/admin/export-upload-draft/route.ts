@@ -15,6 +15,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const now = new Date();
+
     const fileName = `${booking}_${Date.now()}.pdf`;
     const storagePath = `export-draft/${fileName}`;
 
@@ -41,21 +43,38 @@ export async function POST(req: NextRequest) {
 
     const publicUrl = data.publicUrl;
 
-    db.prepare(`
+    // ===============================
+    // UPDATE (PostgreSQL style)
+    // ===============================
+    await db.query(
+      `
       UPDATE export_shipments
       SET 
-        draft_invoice_filename = ?,
-        draft_invoice_uploaded_at = datetime('now')
-      WHERE booking_number = ?
-    `).run(publicUrl, booking);
+        draft_invoice_filename = $1,
+        draft_invoice_uploaded_at = $2
+      WHERE booking_number = $3
+      `,
+      [
+        publicUrl,
+        now.toISOString(),
+        booking
+      ]
+    );
 
-    const updated = db
-      .prepare(`SELECT * FROM export_shipments WHERE booking_number = ?`)
-      .get(booking);
+    // ===============================
+    // SELECT updated row
+    // ===============================
+    const { rows } = await db.query(
+      `
+      SELECT * FROM export_shipments
+      WHERE booking_number = $1
+      `,
+      [booking]
+    );
 
     return NextResponse.json({
       success: true,
-      data: updated,
+      data: rows[0] || null,
     });
 
   } catch (error) {

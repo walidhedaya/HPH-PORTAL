@@ -3,12 +3,10 @@ import db from "@/lib/db";
 
 export async function GET() {
   try {
-    const rows = db
-      .prepare(`
-        SELECT * FROM export_shipments
-        ORDER BY created_at DESC
-      `)
-      .all();
+    const { rows } = await db.query(`
+      SELECT * FROM export_shipments
+      ORDER BY created_at DESC
+    `);
 
     const withStage = rows.map((row: any) => {
       let stage = "BOOKING CREATED";
@@ -37,6 +35,7 @@ export async function GET() {
     });
 
   } catch (error) {
+    console.error(error);
     return NextResponse.json(
       { success: false, message: "Server error" },
       { status: 500 }
