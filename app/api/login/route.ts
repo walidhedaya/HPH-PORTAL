@@ -45,11 +45,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // 🔐 create JWT token
+    // 🔐 Create JWT token
     const token = createToken({
       id: user.id,
       tax_id: user.tax_id,
-      role: user.role
+      role: user.role,
     });
 
     const res = NextResponse.json({
@@ -58,13 +58,13 @@ export async function POST(req: Request) {
       role: user.role,
     });
 
-    // 🔐 store token in HttpOnly cookie
+    // 🔐 Secure cookie (works in localhost and production)
     res.cookies.set("auth_token", token, {
       httpOnly: true,
-      secure: true,
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 8
+      maxAge: 60 * 60 * 8, // 8 hours
     });
 
     return res;
