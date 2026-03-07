@@ -48,6 +48,7 @@ export default function LoginPage() {
       headers: {
         "Content-Type": "application/json",
       },
+      credentials: "include", // 🔐 IMPORTANT FOR JWT COOKIE
       body: JSON.stringify({
         tax_id: username,
         password,
@@ -61,7 +62,7 @@ export default function LoginPage() {
       return;
     }
 
-    // Save session
+    // keep existing system (do not change)
     localStorage.setItem("tax_id", data.tax_id);
     localStorage.setItem("role", data.role);
 
