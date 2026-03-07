@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { createToken } from "@/lib/auth";
 
 type LoginBody = {
   tax_id: string;
@@ -44,14 +45,33 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({
+    // 🔐 create JWT token
+    const token = createToken({
+      id: user.id,
+      tax_id: user.tax_id,
+      role: user.role
+    });
+
+    const res = NextResponse.json({
       success: true,
       tax_id: user.tax_id,
       role: user.role,
     });
 
+    // 🔐 store token in HttpOnly cookie
+    res.cookies.set("auth_token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 8
+    });
+
+    return res;
+
   } catch (error) {
     console.error("LOGIN ERROR:", error);
+
     return NextResponse.json(
       { error: "Server error" },
       { status: 500 }
