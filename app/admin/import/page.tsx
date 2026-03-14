@@ -42,9 +42,16 @@ export default function AdminImportPage() {
       ? localStorage.getItem("terminal")
       : null;
 
-  // =====================
+  // ADMIN GUARD
+  useEffect(() => {
+    const storedRole = localStorage.getItem("role");
+
+    if (!storedRole || storedRole !== "admin") {
+      router.push("/login");
+    }
+  }, [router]);
+
   // Load BLs
-  // =====================
   useEffect(() => {
     fetch("/api/bls")
       .then(res => res.json())
@@ -53,24 +60,17 @@ export default function AdminImportPage() {
       });
   }, []);
 
-  // =====================
   // Load Queue
-  // =====================
   useEffect(() => {
     if (!terminal) return;
 
     fetch(`/api/admin-queue?terminal=${terminal}`)
       .then(res => res.json())
       .then(data => {
-        if (data.success) {
-          setQueue(data.data);
-        }
+        if (data.success) setQueue(data.data);
       });
   }, [terminal]);
 
-  // =====================
-  // SEARCH FUNCTION
-  // =====================
   const handleSearch = () => {
     setSearchMsg(null);
 
@@ -91,9 +91,6 @@ export default function AdminImportPage() {
     router.push(`/admin/review?bl=${found.bl_number}`);
   };
 
-  // =====================
-  // Upload Excel
-  // =====================
   const handleExcelUpload = async () => {
     if (!excelFile) {
       setMessage("Please select an Excel file");
@@ -139,9 +136,6 @@ export default function AdminImportPage() {
     }
   };
 
-  // =====================
-  // Create User
-  // =====================
   const handleCreateUser = async () => {
     setUserMsg(null);
 
@@ -189,7 +183,6 @@ export default function AdminImportPage() {
 
         <div className="admin-grid">
 
-          {/* Upload BL */}
           <div className="mini-card">
             <h4>Upload BL Excel</h4>
             <input
@@ -207,7 +200,6 @@ export default function AdminImportPage() {
             )}
           </div>
 
-          {/* Search */}
           <div className="mini-card">
             <h4>Search BL</h4>
             <input
@@ -225,7 +217,6 @@ export default function AdminImportPage() {
             )}
           </div>
 
-          {/* Create User */}
           <div className="mini-card">
             <h4>Create User</h4>
 
@@ -249,7 +240,6 @@ export default function AdminImportPage() {
               onChange={e => setConfirm(e.target.value)}
             />
 
-            {/* Role Selector */}
             <select
               value={role}
               onChange={e =>
@@ -274,7 +264,6 @@ export default function AdminImportPage() {
 
         </div>
 
-        {/* Queue Table */}
         <div style={{ marginTop: "40px" }}>
           <h3 style={{ marginBottom: "15px" }}>
             Processing Queue ({terminal})

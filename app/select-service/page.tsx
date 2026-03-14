@@ -19,9 +19,21 @@ const translations = {
 export default function SelectServicePage() {
   const router = useRouter();
   const [lang, setLang] = useState<"en" | "ar">("en");
+  const [role, setRole] = useState<string | null>(null);
+
   const t = translations[lang];
 
   useEffect(() => {
+
+    const savedRole = localStorage.getItem("role");
+
+    if (!savedRole) {
+      router.push("/login");
+      return;
+    }
+
+    setRole(savedRole);
+
     const style = document.createElement("style");
     style.innerHTML = `
       @keyframes fadeUp {
@@ -36,20 +48,24 @@ export default function SelectServicePage() {
       }
     `;
     document.head.appendChild(style);
-  }, []);
+
+  }, [router]);
 
   function goTo(service: "import" | "export") {
-    const role = localStorage.getItem("role") || "user";
+
+    if (!role) return;
 
     if (role === "admin") {
       router.push(`/admin/${service}`);
     } else {
       router.push(`/${service}`);
     }
+
   }
 
   return (
     <div className="page-bg">
+
       {/* Language Switch */}
       <div className="lang-switch">
         <button
@@ -58,6 +74,7 @@ export default function SelectServicePage() {
         >
           EN
         </button>
+
         <button
           className={lang === "ar" ? "active" : ""}
           onClick={() => setLang("ar")}
@@ -83,7 +100,10 @@ export default function SelectServicePage() {
           {t.import}
         </button>
 
-        <button onClick={() => goTo("export")}>{t.export}</button>
+        <button onClick={() => goTo("export")}>
+          {t.export}
+        </button>
+
       </div>
     </div>
   );
