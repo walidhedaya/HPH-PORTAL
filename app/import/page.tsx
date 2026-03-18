@@ -15,6 +15,7 @@ type Shipment = {
   final_invoice_filename?: string | null;
   payment_proof_filename?: string | null;
   gate_pass_filename?: string | null;
+  payment_link?: string | null; // ✅ NEW
 };
 
 const translations = {
@@ -24,6 +25,7 @@ const translations = {
     uploadPDF: "Upload Documents",
     draft: "Download Draft Invoice",
     uploadPayment: "Upload Payment Proof",
+    pay: "PAY", // ✅ NEW
     final: "Download Final Invoice",
     gate: "Download Gate Slip",
     appointment: "Book Appointment",
@@ -43,6 +45,7 @@ const translations = {
     uploadPDF: "رفع المستندات",
     draft: "تحميل الفاتورة المبدئية",
     uploadPayment: "رفع إثبات الدفع",
+    pay: "الدفع", // ✅ NEW
     final: "تحميل الفاتورة النهائية",
     gate: "تحميل إذن الخروج",
     appointment: "حجز موعد",
@@ -148,6 +151,11 @@ export default function ImportPage() {
     window.open(url, "_blank");
   }
 
+  function openPayment() {
+    if (!shipment?.payment_link) return;
+    window.open(shipment.payment_link, "_blank");
+  }
+
   return (
     <div className="page-bg">
       <div className="lang-switch">
@@ -186,7 +194,6 @@ export default function ImportPage() {
 
         {shipment && (
           <>
-            {/* Required Documents */}
             <div className="mini-card" style={{ marginBottom: 20 }}>
               <h4>{t.required}</h4>
               <p>{t.docs}</p>
@@ -266,9 +273,25 @@ export default function ImportPage() {
                     ? t.draft
                     : "Waiting for Draft"}
                 </button>
+
+                {/* ✅ PAY BUTTON */}
+                <button
+                  style={{ marginTop: 10 }}
+                  className={btnClass(
+                    !!shipment.payment_link &&
+                    !!shipment.draft_invoice_filename
+                  )}
+                  disabled={
+                    !shipment.payment_link ||
+                    !shipment.draft_invoice_filename
+                  }
+                  onClick={openPayment}
+                >
+                  {t.pay}
+                </button>
               </div>
 
-              {/* Payment */}
+              {/* Payment Upload */}
               <div className="mini-card">
                 <h4>{t.uploadPayment}</h4>
 

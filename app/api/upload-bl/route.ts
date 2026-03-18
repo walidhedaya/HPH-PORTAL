@@ -1,9 +1,23 @@
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import db from "@/lib/db";
 import * as XLSX from "xlsx";
+import { verifyAdmin } from "@/lib/adminGuard";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+
+  // ===============================
+  // ADMIN SECURITY CHECK
+  // ===============================
+  if (!verifyAdmin(req)) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 403 }
+    );
+  }
+
   try {
+
     const formData = await req.formData();
     const file = formData.get("file") as File;
 
@@ -15,13 +29,17 @@ export async function POST(req: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
     const workbook = XLSX.read(buffer, { type: "buffer" });
+
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
     const rows = XLSX.utils.sheet_to_json<any>(sheet);
 
     const now = new Date().toISOString();
 
     for (const row of rows) {
+
       if (!row.bl_number || !row.tax_id || !row.terminal) continue;
 
       await db.query(
@@ -39,14 +57,19 @@ export async function POST(req: Request) {
           now,
         ]
       );
+
     }
 
     return NextResponse.json({ success: true });
+
   } catch (err: any) {
+
     console.error("UPLOAD BL ERROR:", err);
+
     return NextResponse.json(
       { error: err.message },
       { status: 500 }
     );
+
   }
 }

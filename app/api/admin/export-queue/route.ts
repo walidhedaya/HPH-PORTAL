@@ -1,14 +1,27 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
+import { verifyAdmin } from "@/lib/adminGuard";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+
+  const admin = verifyAdmin(req);
+
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
   try {
+
     const { rows } = await db.query(`
       SELECT * FROM export_shipments
       ORDER BY created_at DESC
     `);
 
     const withStage = rows.map((row: any) => {
+
       let stage = "BOOKING CREATED";
 
       if (row.export_docs_filename)
@@ -27,6 +40,7 @@ export async function GET() {
         stage = "GATE ISSUED";
 
       return { ...row, stage };
+
     });
 
     return NextResponse.json({
@@ -35,10 +49,13 @@ export async function GET() {
     });
 
   } catch (error) {
+
     console.error(error);
+
     return NextResponse.json(
       { success: false, message: "Server error" },
       { status: 500 }
     );
+
   }
 }

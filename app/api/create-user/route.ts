@@ -1,8 +1,21 @@
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import db from "@/lib/db";
+import { verifyAdmin } from "@/lib/adminGuard";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+
+  // ===============================
+  // Admin Security Check
+  // ===============================
+  if (!verifyAdmin(req)) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 403 }
+    );
+  }
+
   try {
     const { tax_id, password, role } = await req.json();
 
@@ -61,10 +74,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
 
   } catch (err: any) {
+
     console.error(err);
+
     return NextResponse.json(
       { error: err.message },
       { status: 500 }
     );
+
   }
 }

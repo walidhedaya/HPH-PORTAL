@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 
 const SECRET = process.env.JWT_SECRET as string;
 
-export function verifyAdmin(req: NextRequest) {
+export function verifyUser(req: NextRequest) {
 
   const token = req.cookies.get("auth_token")?.value;
 
@@ -13,9 +13,8 @@ export function verifyAdmin(req: NextRequest) {
 
   try {
 
-    const decoded = jwt.verify(token, SECRET) as { role: string };
-
-    return decoded.role === "admin";
+    jwt.verify(token, SECRET);
+    return true;
 
   } catch {
 

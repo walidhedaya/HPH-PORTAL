@@ -13,6 +13,9 @@ function AdminReviewInner() {
   const [gateFile, setGateFile] = useState<File | null>(null);
   const [adminComment, setAdminComment] = useState("");
 
+  const [paymentLink, setPaymentLink] = useState("");
+  const [paymentMsg, setPaymentMsg] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(false);
 
   const fetchData = async () => {
@@ -102,6 +105,46 @@ function AdminReviewInner() {
     }
   };
 
+  const sendPaymentLink = async () => {
+    if (!bl || !paymentLink.trim()) {
+      setPaymentMsg("Please enter payment link");
+      return;
+    }
+
+    setLoading(true);
+    setPaymentMsg(null);
+
+    try {
+      const res = await fetch("/api/set-payment-link", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bl,
+          payment_link: paymentLink.trim(),
+        }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setPaymentMsg(result.error || "Failed");
+        return;
+      }
+
+      setPaymentMsg("Payment link sent ✅");
+      setPaymentLink("");
+      fetchData();
+
+    } catch (err) {
+      console.error(err);
+      setPaymentMsg("Server error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderLink = (url?: string | null, label?: string) => {
     if (!url || !url.startsWith("http")) {
       return <p>No File Uploaded</p>;
@@ -139,9 +182,12 @@ function AdminReviewInner() {
             {renderLink(data.payment_proof_filename, "View Proof of Payment")}
           </div>
 
+          {/* ================= DRAFT INVOICE ================= */}
           <div className="mini-card">
             <h4>Draft Invoice</h4>
+
             {renderLink(data.draft_invoice_filename, "View Draft Invoice")}
+
             <input
               type="file"
               accept=".pdf"
@@ -149,6 +195,7 @@ function AdminReviewInner() {
                 setDraftFile(e.target.files?.[0] || null)
               }
             />
+
             <button
               disabled={loading}
               onClick={() =>
@@ -161,8 +208,31 @@ function AdminReviewInner() {
             >
               Upload / Replace Draft
             </button>
+
+            {/* ===== PAYMENT LINK ===== */}
+            <input
+              placeholder="Paste payment link here"
+              value={paymentLink}
+              onChange={(e) => setPaymentLink(e.target.value)}
+              style={{ marginTop: "10px" }}
+            />
+
+            <button
+              disabled={loading}
+              style={{ background: "#16a34a", marginTop: "6px" }}
+              onClick={sendPaymentLink}
+            >
+              Send Payment Link
+            </button>
+
+            {paymentMsg && (
+              <p style={{ marginTop: 6, fontSize: 13 }}>
+                {paymentMsg}
+              </p>
+            )}
           </div>
 
+          {/* ================= FINAL ================= */}
           <div className="mini-card">
             <h4>Final Invoice</h4>
             {renderLink(data.final_invoice_filename, "View Final Invoice")}
@@ -187,6 +257,7 @@ function AdminReviewInner() {
             </button>
           </div>
 
+          {/* ================= GATE ================= */}
           <div className="mini-card">
             <h4>Gate Slip</h4>
             {renderLink(data.gate_pass_filename, "View Gate Slip")}

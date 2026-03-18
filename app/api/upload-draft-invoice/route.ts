@@ -1,9 +1,23 @@
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import db from "@/lib/db";
 import { supabase } from "@/lib/supabase";
+import { verifyAdmin } from "@/lib/adminGuard";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+
+  // ===============================
+  // ADMIN SECURITY CHECK
+  // ===============================
+  if (!verifyAdmin(req)) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 403 }
+    );
+  }
+
   try {
+
     const formData = await req.formData();
 
     const file = formData.get("file") as File | null;
@@ -78,10 +92,13 @@ export async function POST(req: Request) {
     });
 
   } catch (err) {
+
     console.error("Upload draft invoice error:", err);
+
     return NextResponse.json(
       { error: "Server error" },
       { status: 500 }
     );
+
   }
 }

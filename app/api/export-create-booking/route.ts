@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
+import { verifyUser } from "@/lib/authGuard";
 
 export async function POST(req: NextRequest) {
+
+  // ===============================
+  // USER SECURITY CHECK
+  // ===============================
+  if (!verifyUser(req)) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
   try {
+
     const body = await req.json();
     const { booking_number, terminal, tax_id } = body;
 
@@ -70,10 +83,13 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
+
     console.error(error);
+
     return NextResponse.json(
       { success: false, message: "Server error" },
       { status: 500 }
     );
+
   }
 }

@@ -1,8 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
+import { verifyAdmin } from "@/lib/adminGuard";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+
+  const admin = verifyAdmin(req);
+
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
   try {
+
     const { rows } = await db.query(`
       SELECT
         bl_number,
@@ -20,11 +32,15 @@ export async function GET() {
       success: true,
       data: rows,
     });
+
   } catch (err) {
+
     console.error("Pending reviews error:", err);
+
     return NextResponse.json(
       { error: "Server error" },
       { status: 500 }
     );
+
   }
 }

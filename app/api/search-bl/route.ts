@@ -10,12 +10,13 @@ export async function GET(req: Request) {
     const terminal = searchParams.get("terminal");
 
     // ===============================
-    // ADMIN SEARCH (no terminal required)
+    // ADMIN SEARCH (full access)
     // ===============================
     if (bl && !terminal) {
       const { rows } = await db.query(
         `
-        SELECT * FROM shipments
+        SELECT *
+        FROM shipments
         WHERE LOWER(bl_number) = LOWER($1)
         `,
         [bl]
@@ -32,7 +33,7 @@ export async function GET(req: Request) {
     }
 
     // ===============================
-    // USER SEARCH (requires terminal)
+    // USER SEARCH (restricted fields)
     // ===============================
     if (!terminal || (!bl && !taxId)) {
       return NextResponse.json({ success: false });
@@ -40,11 +41,23 @@ export async function GET(req: Request) {
 
     let rows;
 
-    // Search by BL
     if (bl) {
       const result = await db.query(
         `
-        SELECT * FROM shipments
+        SELECT
+          bl_number,
+          tax_id,
+          terminal,
+          consignee,
+          pdf_status,
+          admin_comment,
+          pdf_filename,
+          draft_invoice_filename,
+          final_invoice_filename,
+          payment_proof_filename,
+          gate_pass_filename,
+          payment_link
+        FROM shipments
         WHERE LOWER(terminal) = LOWER($1)
         AND LOWER(bl_number) = LOWER($2)
         `,
@@ -53,11 +66,23 @@ export async function GET(req: Request) {
       rows = result.rows;
     }
 
-    // Search by Tax ID
     else if (taxId) {
       const result = await db.query(
         `
-        SELECT * FROM shipments
+        SELECT
+          bl_number,
+          tax_id,
+          terminal,
+          consignee,
+          pdf_status,
+          admin_comment,
+          pdf_filename,
+          draft_invoice_filename,
+          final_invoice_filename,
+          payment_proof_filename,
+          gate_pass_filename,
+          payment_link
+        FROM shipments
         WHERE LOWER(terminal) = LOWER($1)
         AND LOWER(tax_id) = LOWER($2)
         `,
@@ -74,6 +99,7 @@ export async function GET(req: Request) {
       success: true,
       data: rows[0],
     });
+
   } catch (error) {
     console.error("SEARCH BL ERROR:", error);
     return NextResponse.json(

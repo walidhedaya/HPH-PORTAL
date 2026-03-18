@@ -1,8 +1,22 @@
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import db from "@/lib/db";
+import { verifyAdmin } from "@/lib/adminGuard";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
+
+  // ===============================
+  // ADMIN SECURITY CHECK
+  // ===============================
+  if (!verifyAdmin(req)) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 403 }
+    );
+  }
+
   try {
+
     const { searchParams } = new URL(req.url);
     const terminal = searchParams.get("terminal");
 
@@ -44,6 +58,7 @@ export async function GET(req: Request) {
     );
 
     const data = rows.map((row: any) => {
+
       let stage = "OPEN";
 
       if (row.gate_pass_filename) {
@@ -77,17 +92,22 @@ export async function GET(req: Request) {
         timestamp: lastTime,
         handling_admin: row.handling_admin || "-",
       };
+
     });
 
     return NextResponse.json({
       success: true,
       data,
     });
+
   } catch (error) {
+
     console.error("ADMIN QUEUE ERROR:", error);
+
     return NextResponse.json(
       { success: false, message: "Server error" },
       { status: 500 }
     );
+
   }
 }

@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
 import { supabase } from "@/lib/supabase";
+import { verifyAdmin } from "@/lib/adminGuard";
 
 export async function POST(req: NextRequest) {
+
+  const admin = verifyAdmin(req);
+
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
   try {
+
     const formData = await req.formData();
     const file = formData.get("file") as File;
     const booking = formData.get("booking_number") as string;
@@ -78,10 +90,13 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
+
     console.error(error);
+
     return NextResponse.json(
       { success: false, message: "Upload failed" },
       { status: 500 }
     );
+
   }
 }
