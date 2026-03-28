@@ -52,7 +52,7 @@ export default function SelectTerminalPage() {
 
         <h2>{t.title}</h2>
 
-        {/* AQCT ONLY */}
+        {/* AQCT */}
         <button
           style={{ marginBottom: "14px" }}
           onClick={() => selectTerminal("AQCT")}
@@ -60,8 +60,7 @@ export default function SelectTerminalPage() {
           {t.aqct}
         </button>
 
-        {/* TEMPORARILY HIDDEN */}
-        {/*
+        {/* RSCT */}
         <button
           style={{ marginBottom: "14px" }}
           onClick={() => selectTerminal("RSCT")}
@@ -69,10 +68,10 @@ export default function SelectTerminalPage() {
           {t.rsct}
         </button>
 
+        {/* DCT */}
         <button onClick={() => selectTerminal("DCT")}>
           {t.dct}
         </button>
-        */}
       </div>
     </div>
   );
