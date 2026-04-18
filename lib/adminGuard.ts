@@ -1,25 +1,40 @@
 import { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
 
-const SECRET = process.env.JWT_SECRET as string;
+// 🔐 Load SECRET
+const SECRET = process.env.JWT_SECRET;
 
-export function verifyAdmin(req: NextRequest) {
+if (!SECRET) {
+  throw new Error("CRITICAL: JWT_SECRET is not defined!");
+}
+
+// 👇 الحل هنا
+const JWT_SECRET: string = SECRET;
+
+// ===============================
+type AdminPayload = {
+  id: number;
+  role: "admin" | "super_admin";
+};
+
+export function verifyAdmin(req: NextRequest): AdminPayload | null {
 
   const token = req.cookies.get("auth_token")?.value;
 
-  if (!token) {
-    return false;
-  }
+  if (!token) return null;
 
   try {
 
-    const decoded = jwt.verify(token, SECRET) as { role: string };
+    const decoded = jwt.verify(token, JWT_SECRET) as AdminPayload;
 
-    return decoded.role === "admin";
+    if (decoded.role !== "admin" && decoded.role !== "super_admin") {
+      return null;
+    }
 
-  } catch {
+    return decoded;
 
-    return false;
-
+  } catch (err) {
+    console.error("ADMIN TOKEN ERROR:", err);
+    return null;
   }
 }

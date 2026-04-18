@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import db from "@/lib/db";
+import { verifyAdmin } from "@/lib/adminGuard";
+import { verifyToken } from "@/lib/auth";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
+
   try {
+
     const { searchParams } = new URL(req.url);
 
     const bl = searchParams.get("bl");
@@ -10,98 +15,146 @@ export async function GET(req: Request) {
     const terminal = searchParams.get("terminal");
 
     // ===============================
-    // ADMIN SEARCH (full access)
+    // 🔐 ADMIN FLOW (ISOLATED)
     // ===============================
-    if (bl && !terminal) {
+    const isAdmin = verifyAdmin(req);
+
+    if (isAdmin) {
+
+      if (!bl) {
+        return NextResponse.json(
+          { error: "BL is required for admin search" },
+          { status: 400 }
+        );
+      }
+
       const { rows } = await db.query(
         `
-        SELECT *
+        SELECT id, bl_number, tax_id, terminal, consignee, pdf_status
         FROM shipments
         WHERE LOWER(bl_number) = LOWER($1)
         `,
         [bl]
       );
 
-      if (rows.length === 0) {
-        return NextResponse.json({ success: false });
-      }
-
       return NextResponse.json({
-        success: true,
-        data: rows[0],
+        success: rows.length > 0,
+        data: rows[0] || null,
       });
     }
 
     // ===============================
-    // USER SEARCH (restricted fields)
+    // 🔐 USER AUTH REQUIRED
+    // ===============================
+    const token = req.cookies.get("auth_token")?.value;
+
+    if (!token) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const user = verifyToken(token);
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Invalid token" },
+        { status: 401 }
+      );
+    }
+
+    // ===============================
+    // VALIDATION
     // ===============================
     if (!terminal || (!bl && !taxId)) {
       return NextResponse.json({ success: false });
     }
 
-    let rows;
-
+    // ===============================
+    // USER SEARCH BY BL
+    // ===============================
     if (bl) {
-      const result = await db.query(
+
+      const { rows } = await db.query(
         `
         SELECT
+          id,
           bl_number,
           tax_id,
           terminal,
           consignee,
           pdf_status,
-          admin_comment,
-          pdf_filename,
-          draft_invoice_filename,
-          final_invoice_filename,
-          payment_proof_filename,
-          gate_pass_filename,
-          payment_link
-        FROM shipments
+          admin_comment
+        FROM shipments s
         WHERE LOWER(terminal) = LOWER($1)
         AND LOWER(bl_number) = LOWER($2)
+        AND (
+          EXISTS (
+            SELECT 1
+            FROM user_tax_access uta
+            WHERE uta.user_id = $3
+            AND LOWER(uta.tax_id) = LOWER(s.tax_id)
+          )
+        )
         `,
-        [terminal, bl]
+        [
+          terminal,
+          bl,
+          user.id
+        ]
       );
-      rows = result.rows;
+
+      return NextResponse.json({
+        success: rows.length > 0,
+        data: rows[0] || null,
+      });
     }
 
-    else if (taxId) {
-      const result = await db.query(
+    // ===============================
+    // USER SEARCH BY TAX ID (FIXED)
+    // ===============================
+    if (taxId) {
+
+      const { rows } = await db.query(
         `
         SELECT
+          id,
           bl_number,
           tax_id,
           terminal,
           consignee,
           pdf_status,
-          admin_comment,
-          pdf_filename,
-          draft_invoice_filename,
-          final_invoice_filename,
-          payment_proof_filename,
-          gate_pass_filename,
-          payment_link
-        FROM shipments
+          admin_comment
+        FROM shipments s
         WHERE LOWER(terminal) = LOWER($1)
         AND LOWER(tax_id) = LOWER($2)
+        AND EXISTS (
+          SELECT 1
+          FROM user_tax_access uta
+          WHERE uta.user_id = $3
+          AND LOWER(uta.tax_id) = LOWER($2)
+        )
         `,
-        [terminal, taxId]
+        [
+          terminal,
+          taxId,
+          user.id
+        ]
       );
-      rows = result.rows;
+
+      return NextResponse.json({
+        success: rows.length > 0,
+        data: rows, // ✅ FIXED (array)
+      });
     }
 
-    if (!rows || rows.length === 0) {
-      return NextResponse.json({ success: false });
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: rows[0],
-    });
+    return NextResponse.json({ success: false });
 
   } catch (error) {
+
     console.error("SEARCH BL ERROR:", error);
+
     return NextResponse.json(
       { success: false, message: "Server error" },
       { status: 500 }
