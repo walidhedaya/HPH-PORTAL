@@ -1,15 +1,16 @@
 import { NextRequest } from "next/server";
-import jwt from "jsonwebtoken";
+import { jwtVerify } from "jose";
 
-// 🔐 Load SECRET
+// ===============================
+// 🔐 SECRET
+// ===============================
 const SECRET = process.env.JWT_SECRET;
 
 if (!SECRET) {
   throw new Error("CRITICAL: JWT_SECRET is not defined!");
 }
 
-// 👇 الحل هنا
-const JWT_SECRET: string = SECRET;
+const secret = new TextEncoder().encode(SECRET);
 
 // ===============================
 type AdminPayload = {
@@ -17,21 +18,22 @@ type AdminPayload = {
   role: "admin" | "super_admin";
 };
 
-export function verifyAdmin(req: NextRequest): AdminPayload | null {
-
-  const token = req.cookies.get("auth_token")?.value;
-
-  if (!token) return null;
-
+// ===============================
+export async function verifyAdmin(req: NextRequest): Promise<AdminPayload | null> {
   try {
+    const token = req.cookies.get("auth_token")?.value;
 
-    const decoded = jwt.verify(token, JWT_SECRET) as AdminPayload;
+    if (!token) return null;
 
-    if (decoded.role !== "admin" && decoded.role !== "super_admin") {
+    const { payload } = await jwtVerify(token, secret);
+
+    const user = payload as AdminPayload;
+
+    if (user.role !== "admin" && user.role !== "super_admin") {
       return null;
     }
 
-    return decoded;
+    return user;
 
   } catch (err) {
     console.error("ADMIN TOKEN ERROR:", err);

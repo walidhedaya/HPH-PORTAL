@@ -1,24 +1,40 @@
 import { NextRequest } from "next/server";
-import jwt from "jsonwebtoken";
+import { jwtVerify } from "jose";
 
-const SECRET = process.env.JWT_SECRET as string;
+// ===============================
+const SECRET = process.env.JWT_SECRET;
 
-export function verifyUser(req: NextRequest) {
+if (!SECRET) {
+  throw new Error("CRITICAL: JWT_SECRET is not defined!");
+}
 
-  const token = req.cookies.get("auth_token")?.value;
+const secret = new TextEncoder().encode(SECRET);
 
-  if (!token) {
-    return false;
-  }
+// ===============================
+type UserPayload = {
+  id: number;
+  role: "user" | "admin" | "super_admin";
+  full_access?: boolean;
+};
 
+// ===============================
+export async function verifyUser(req: NextRequest): Promise<UserPayload | null> {
   try {
+    const token = req.cookies.get("auth_token")?.value;
 
-    jwt.verify(token, SECRET);
-    return true;
+    if (!token) return null;
 
-  } catch {
+    const { payload } = await jwtVerify(token, secret);
 
-    return false;
+    const user = payload as UserPayload;
 
+    // allow all roles
+    if (!user.role) return null;
+
+    return user;
+
+  } catch (err) {
+    console.error("USER TOKEN ERROR:", err);
+    return null;
   }
 }

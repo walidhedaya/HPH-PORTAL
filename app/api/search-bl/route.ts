@@ -1,13 +1,10 @@
-import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import db from "@/lib/db";
 import { verifyAdmin } from "@/lib/adminGuard";
 import { verifyToken } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-
   try {
-
     const { searchParams } = new URL(req.url);
 
     const bl = searchParams.get("bl");
@@ -17,10 +14,9 @@ export async function GET(req: NextRequest) {
     // ===============================
     // 🔐 ADMIN FLOW (ISOLATED)
     // ===============================
-    const isAdmin = verifyAdmin(req);
+    const admin = await verifyAdmin(req);
 
-    if (isAdmin) {
-
+    if (admin) {
       if (!bl) {
         return NextResponse.json(
           { error: "BL is required for admin search" },
@@ -30,7 +26,13 @@ export async function GET(req: NextRequest) {
 
       const { rows } = await db.query(
         `
-        SELECT id, bl_number, tax_id, terminal, consignee, pdf_status
+        SELECT 
+          id,
+          bl_number,
+          tax_id,
+          terminal,
+          consignee,
+          pdf_status
         FROM shipments
         WHERE LOWER(bl_number) = LOWER($1)
         `,
@@ -44,7 +46,7 @@ export async function GET(req: NextRequest) {
     }
 
     // ===============================
-    // 🔐 USER AUTH REQUIRED
+    // 🔐 USER AUTH
     // ===============================
     const token = req.cookies.get("auth_token")?.value;
 
@@ -72,10 +74,9 @@ export async function GET(req: NextRequest) {
     }
 
     // ===============================
-    // USER SEARCH BY BL
+    // 🔍 USER SEARCH BY BL
     // ===============================
     if (bl) {
-
       const { rows } = await db.query(
         `
         SELECT
@@ -89,20 +90,14 @@ export async function GET(req: NextRequest) {
         FROM shipments s
         WHERE LOWER(terminal) = LOWER($1)
         AND LOWER(bl_number) = LOWER($2)
-        AND (
-          EXISTS (
-            SELECT 1
-            FROM user_tax_access uta
-            WHERE uta.user_id = $3
-            AND LOWER(uta.tax_id) = LOWER(s.tax_id)
-          )
+        AND EXISTS (
+          SELECT 1
+          FROM user_tax_access uta
+          WHERE uta.user_id = $3
+          AND LOWER(uta.tax_id) = LOWER(s.tax_id)
         )
         `,
-        [
-          terminal,
-          bl,
-          user.id
-        ]
+        [terminal, bl, user.id]
       );
 
       return NextResponse.json({
@@ -112,10 +107,9 @@ export async function GET(req: NextRequest) {
     }
 
     // ===============================
-    // USER SEARCH BY TAX ID (FIXED)
+    // 🔍 USER SEARCH BY TAX ID
     // ===============================
     if (taxId) {
-
       const { rows } = await db.query(
         `
         SELECT
@@ -136,23 +130,18 @@ export async function GET(req: NextRequest) {
           AND LOWER(uta.tax_id) = LOWER($2)
         )
         `,
-        [
-          terminal,
-          taxId,
-          user.id
-        ]
+        [terminal, taxId, user.id]
       );
 
       return NextResponse.json({
         success: rows.length > 0,
-        data: rows, // ✅ FIXED (array)
+        data: rows,
       });
     }
 
     return NextResponse.json({ success: false });
 
   } catch (error) {
-
     console.error("SEARCH BL ERROR:", error);
 
     return NextResponse.json(

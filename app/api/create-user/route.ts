@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import db from "@/lib/db";
 import { verifyAdmin } from "@/lib/adminGuard";
@@ -9,7 +8,7 @@ export async function POST(req: NextRequest) {
   // ===============================
   // 🔐 Admin Verification
   // ===============================
-  const admin = verifyAdmin(req);
+  const admin = await verifyAdmin(req);
 
   if (!admin) {
     return NextResponse.json(
@@ -21,13 +20,21 @@ export async function POST(req: NextRequest) {
   const client = await db.connect();
 
   try {
-
     const body = await req.json();
 
-    const tax_id = String(body.tax_id || "").trim();
+    const tax_id = String(body.tax_id || "").trim().toLowerCase();
     const password = String(body.password || "");
     const role = String(body.role || "");
-    const allowedTaxIds: string[] = body.allowed_tax_ids || [];
+
+    // ✅ sanitize + deduplicate
+    const allowedTaxIds: string[] = Array.from(
+      new Set(
+        (body.allowed_tax_ids || [])
+          .map((t: any) => String(t).trim().toLowerCase())
+          .filter(Boolean)
+      )
+    );
+
     const fullAccess: boolean = body.full_access === true;
 
     // ===============================
@@ -85,7 +92,7 @@ export async function POST(req: NextRequest) {
     // Check existing user
     // ===============================
     const { rows: existing } = await client.query(
-      `SELECT id FROM users WHERE tax_id = $1`,
+      `SELECT id FROM users WHERE LOWER(tax_id) = LOWER($1)`,
       [tax_id]
     );
 
@@ -127,7 +134,7 @@ export async function POST(req: NextRequest) {
     const userId = rows[0].id;
 
     // ===============================
-    // Bulk insert tax access (FIXED)
+    // Bulk insert tax access
     // ===============================
     if (!fullAccess && role === "user") {
 
@@ -137,11 +144,7 @@ export async function POST(req: NextRequest) {
       let index = 1;
 
       for (const t of allowedTaxIds) {
-        const clean = String(t).trim();
-        if (!clean) continue;
-
-        values.push(userId, clean);
-
+        values.push(userId, t);
         placeholders.push(`($${index}, $${index + 1})`);
         index += 2;
       }
@@ -167,9 +170,11 @@ export async function POST(req: NextRequest) {
     // ===============================
     console.log("ADMIN CREATE USER", {
       admin_id: admin.id,
+      role,
       created_user: tax_id,
       full_access: fullAccess,
-      allowed_count: allowedTaxIds.length
+      allowed_count: allowedTaxIds.length,
+      timestamp: new Date().toISOString()
     });
 
     return NextResponse.json({

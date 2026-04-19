@@ -3,15 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Shipment = {
-  id: number;
-  bl_number: string;
-  tax_id: string;
-  terminal: string;
-  consignee: string;
-  pdf_status?: string | null;
-};
-
 type QueueItem = {
   bl_number: string;
   terminal: string;
@@ -23,7 +14,6 @@ type QueueItem = {
 export default function AdminImportPage() {
   const router = useRouter();
 
-  const [bls, setBls] = useState<Shipment[]>([]);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [search, setSearch] = useState("");
   const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -35,6 +25,8 @@ export default function AdminImportPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [role, setRole] = useState<"user" | "admin">("user");
+  const [fullAccess, setFullAccess] = useState(false);
+  const [allowedTaxIds, setAllowedTaxIds] = useState("");
   const [userMsg, setUserMsg] = useState<string | null>(null);
 
   const terminal =
@@ -42,23 +34,13 @@ export default function AdminImportPage() {
       ? localStorage.getItem("terminal")
       : null;
 
-  // ADMIN GUARD
+  // TEMP UI GUARD (real protection = middleware)
   useEffect(() => {
     const storedRole = localStorage.getItem("role");
-
     if (!storedRole || storedRole !== "admin") {
       router.push("/login");
     }
   }, [router]);
-
-  // Load BLs
-  useEffect(() => {
-    fetch("/api/bls")
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) setBls(data.data);
-      });
-  }, []);
 
   // Load Queue
   useEffect(() => {
@@ -71,7 +53,8 @@ export default function AdminImportPage() {
       });
   }, [terminal]);
 
-  const handleSearch = () => {
+  // SEARCH (secure)
+  const handleSearch = async () => {
     setSearchMsg(null);
 
     if (!search.trim()) {
@@ -79,18 +62,24 @@ export default function AdminImportPage() {
       return;
     }
 
-    const found = bls.find(
-      b => b.bl_number.toLowerCase() === search.trim().toLowerCase()
-    );
+    try {
+      const res = await fetch(
+        `/api/search-bl?bl=${search.trim()}&terminal=${terminal}`
+      );
 
-    if (!found) {
-      setSearchMsg("BL not found");
-      return;
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        router.push(`/admin/review?bl=${data.data.bl_number}`);
+      } else {
+        setSearchMsg("BL not found or unauthorized");
+      }
+    } catch {
+      setSearchMsg("Server error");
     }
-
-    router.push(`/admin/review?bl=${found.bl_number}`);
   };
 
+  // UPLOAD
   const handleExcelUpload = async () => {
     if (!excelFile) {
       setMessage("Please select an Excel file");
@@ -116,10 +105,6 @@ export default function AdminImportPage() {
         return;
       }
 
-      const blRes = await fetch("/api/bls");
-      const blData = await blRes.json();
-      if (blData.success) setBls(blData.data);
-
       setMessage("Excel uploaded successfully");
       setExcelFile(null);
 
@@ -136,6 +121,7 @@ export default function AdminImportPage() {
     }
   };
 
+  // CREATE USER
   const handleCreateUser = async () => {
     setUserMsg(null);
 
@@ -151,11 +137,18 @@ export default function AdminImportPage() {
 
     const res = await fetch("/api/create-user", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         tax_id: taxId.trim(),
         password,
         role,
+        full_access: fullAccess,
+        allowed_tax_ids: allowedTaxIds
+          .split(",")
+          .map(t => t.trim())
+          .filter(Boolean),
       }),
     });
 
@@ -171,11 +164,39 @@ export default function AdminImportPage() {
     setPassword("");
     setConfirm("");
     setRole("user");
+    setAllowedTaxIds("");
+    setFullAccess(false);
+  };
+
+  // LOGOUT
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/logout", { method: "POST" });
+      localStorage.clear();
+      window.location.href = "/login";
+    } catch {
+      alert("Logout failed");
+    }
   };
 
   return (
     <div className="page-bg">
       <div className="card admin-card">
+
+        {/* 🔴 LOGOUT BUTTON */}
+        <button
+          onClick={handleLogout}
+          style={{
+            marginBottom: "20px",
+            background: "#d9534f",
+            color: "white",
+            padding: "8px 12px",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          Logout
+        </button>
 
         <h2 style={{ marginBottom: "25px" }}>
           Admin Control Panel
@@ -193,11 +214,7 @@ export default function AdminImportPage() {
             <button onClick={handleExcelUpload}>
               {loading ? "Uploading..." : "Upload Excel"}
             </button>
-            {message && (
-              <p style={{ marginTop: 10, fontSize: 14 }}>
-                {message}
-              </p>
-            )}
+            {message && <p>{message}</p>}
           </div>
 
           <div className="mini-card">
@@ -210,11 +227,7 @@ export default function AdminImportPage() {
             <button onClick={handleSearch}>
               Search
             </button>
-            {searchMsg && (
-              <p style={{ marginTop: 10, fontSize: 14, color: "red" }}>
-                {searchMsg}
-              </p>
-            )}
+            {searchMsg && <p style={{ color: "red" }}>{searchMsg}</p>}
           </div>
 
           <div className="mini-card">
@@ -245,89 +258,74 @@ export default function AdminImportPage() {
               onChange={e =>
                 setRole(e.target.value as "admin" | "user")
               }
-              style={{ marginBottom: "10px" }}
             >
               <option value="user">User</option>
               <option value="admin">Admin</option>
             </select>
 
+            <label>
+              <input
+                type="checkbox"
+                checked={fullAccess}
+                onChange={e => setFullAccess(e.target.checked)}
+              />
+              Full Access
+            </label>
+
+            {!fullAccess && (
+              <input
+                placeholder="Allowed Tax IDs (comma separated)"
+                value={allowedTaxIds}
+                onChange={e => setAllowedTaxIds(e.target.value)}
+              />
+            )}
+
             <button onClick={handleCreateUser}>
               Create User
             </button>
 
-            {userMsg && (
-              <p style={{ marginTop: 10, fontSize: 14 }}>
-                {userMsg}
-              </p>
-            )}
+            {userMsg && <p>{userMsg}</p>}
           </div>
 
         </div>
 
         <div style={{ marginTop: "40px" }}>
-          <h3 style={{ marginBottom: "15px" }}>
-            Processing Queue ({terminal})
-          </h3>
+          <h3>Processing Queue ({terminal})</h3>
 
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: "14px",
-              }}
-            >
-              <thead>
-                <tr style={{ background: "#f1f1f1" }}>
-                  <th style={thStyle}>BL Number</th>
-                  <th style={thStyle}>Stage</th>
-                  <th style={thStyle}>Last Update</th>
-                  <th style={thStyle}>Handling Admin</th>
+          <table style={{ width: "100%" }}>
+            <thead>
+              <tr>
+                <th>BL</th>
+                <th>Stage</th>
+                <th>Date</th>
+                <th>Admin</th>
+              </tr>
+            </thead>
+            <tbody>
+              {queue.map((item, i) => (
+                <tr key={i}>
+                  <td
+                    style={{ cursor: "pointer", color: "blue" }}
+                    onClick={() =>
+                      router.push(`/admin/review?bl=${item.bl_number}`)
+                    }
+                  >
+                    {item.bl_number}
+                  </td>
+                  <td>{item.stage}</td>
+                  <td>
+                    {item.timestamp
+                      ? new Date(item.timestamp).toLocaleString()
+                      : "-"}
+                  </td>
+                  <td>{item.handling_admin}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {queue.map((item, index) => (
-                  <tr key={index}>
-                    <td style={tdStyle}>
-                      <span
-                        style={{
-                          color: "#0d5bd7",
-                          cursor: "pointer",
-                          textDecoration: "underline",
-                        }}
-                        onClick={() =>
-                          router.push(`/admin/review?bl=${item.bl_number}`)
-                        }
-                      >
-                        {item.bl_number}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>{item.stage}</td>
-                    <td style={tdStyle}>
-                      {item.timestamp
-                        ? new Date(item.timestamp).toLocaleString()
-                        : "-"}
-                    </td>
-                    <td style={tdStyle}>{item.handling_admin}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
 
       </div>
     </div>
   );
 }
-
-const thStyle = {
-  padding: "10px",
-  border: "1px solid #ddd",
-  textAlign: "left" as const,
-};
-
-const tdStyle = {
-  padding: "10px",
-  border: "1px solid #ddd",
-};
