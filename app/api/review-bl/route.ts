@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+
     const body = await req.json();
 
     const bl = String(body.bl || "").trim().toUpperCase();
@@ -26,17 +27,36 @@ export async function POST(req: NextRequest) {
 
     if (!["APPROVED", "NEED MORE DOCS"].includes(status)) {
       return NextResponse.json(
-        { error: "Invalid status value" },
+        { error: "Invalid status" },
         { status: 400 }
       );
     }
 
     const now = new Date().toISOString();
 
-    // ===============================
-    // UPDATE + RETURN ID
-    // ===============================
-    const result = await db.query(
+    // 🔐 get latest shipment first
+    const shipmentResult = await db.query(
+      `
+      SELECT id, tax_id
+      FROM shipments
+      WHERE LOWER(bl_number) = LOWER($1)
+      ORDER BY created_at DESC
+      LIMIT 1
+      `,
+      [bl]
+    );
+
+    if (shipmentResult.rows.length === 0) {
+      return NextResponse.json(
+        { error: "BL not found" },
+        { status: 404 }
+      );
+    }
+
+    const shipment = shipmentResult.rows[0];
+
+    // 🔥 safe update by id
+    await db.query(
       `
       UPDATE shipments
       SET
@@ -44,30 +64,18 @@ export async function POST(req: NextRequest) {
         admin_comment = $2,
         reviewed_at = $3,
         handling_admin = $4
-      WHERE LOWER(bl_number) = LOWER($5)
-      RETURNING id
+      WHERE id = $5
       `,
       [
         status,
         comment || null,
         now,
         `admin_${admin.id}`,
-        bl
+        shipment.id
       ]
     );
 
-    if ((result.rowCount ?? 0) === 0) {
-      return NextResponse.json(
-        { error: "BL not found" },
-        { status: 404 }
-      );
-    }
-
-    const shipmentId = result.rows[0].id;
-
-    // ===============================
-    // 🔐 IMMUTABLE LOG
-    // ===============================
+    // 🔐 immutable log
     await db.query(
       `
       INSERT INTO admin_actions_log
@@ -75,7 +83,7 @@ export async function POST(req: NextRequest) {
       VALUES ($1, $2, $3, $4, $5, $6)
       `,
       [
-        shipmentId,
+        shipment.id,
         bl,
         "REVIEW",
         status,
@@ -91,11 +99,13 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (err) {
+
     console.error("Review BL error:", err);
 
     return NextResponse.json(
       { error: "Server error" },
       { status: 500 }
     );
+
   }
 }

@@ -3,14 +3,85 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+// ===============================
+// 🔐 FILE LINK COMPONENT (SECURE FINAL)
+// ===============================
+
+function FileLink({
+  path,
+  label,
+  type,
+  shipmentId,
+}: {
+  path?: string | null;
+  label: string;
+  type: string;
+  shipmentId: number;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  const openFile = async () => {
+    if (!shipmentId || !type || !path || loading) return;
+
+    setLoading(true);
+    const fileWindow = window.open("about:blank", "_blank");
+    if (fileWindow) {
+      fileWindow.opener = null;
+      fileWindow.document.write("Loading...");
+    }
+
+    try {
+      const res = await fetch(
+        `/api/files/get?shipment_id=${shipmentId}&type=${type}`,
+        {
+          credentials: "include",
+          cache: "no-store",
+        }
+      );
+
+      const result = await res.json();
+
+      if (result.success && result.url) {
+        if (fileWindow) {
+          fileWindow.location.href = result.url;
+        } else {
+          window.open(result.url, "_blank", "noopener,noreferrer");
+        }
+      } else {
+        fileWindow?.close();
+        alert(result.error || "File unavailable");
+      }
+    } catch (e) {
+      console.error("File fetch error:", e);
+      fileWindow?.close();
+      alert("File unavailable");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!path) return <p>No File Uploaded</p>;
+
+  return (
+    <button type="button" onClick={openFile} disabled={loading}>
+      {loading ? "Loading..." : label}
+    </button>
+  );
+}
+
+// ===============================
+// MAIN
+// ===============================
 function AdminReviewInner() {
   const searchParams = useSearchParams();
   const bl = searchParams.get("bl");
 
   const [data, setData] = useState<any>(null);
+
   const [draftFile, setDraftFile] = useState<File | null>(null);
   const [finalFile, setFinalFile] = useState<File | null>(null);
   const [gateFile, setGateFile] = useState<File | null>(null);
+
   const [adminComment, setAdminComment] = useState("");
 
   const [paymentLink, setPaymentLink] = useState("");
@@ -18,18 +89,30 @@ function AdminReviewInner() {
 
   const [loading, setLoading] = useState(false);
 
+  // ===============================
+  // FETCH (SECURE + NO CACHE)
+  // ===============================
   const fetchData = async () => {
     if (!bl) return;
 
     try {
-      const res = await fetch(`/api/search-bl?bl=${bl}`);
+      const terminal = localStorage.getItem("terminal");
+
+      const res = await fetch(
+        `/api/search-bl?bl=${bl}&terminal=${terminal}`,
+        {
+          credentials: "include",
+          cache: "no-store", // 🔥 prevent stale
+        }
+      );
+
       const result = await res.json();
 
       if (result.success) {
         setData(result.data);
       }
     } catch (err) {
-      console.error("Fetch error:", err);
+      console.error(err);
     }
   };
 
@@ -37,10 +120,16 @@ function AdminReviewInner() {
     fetchData();
   }, [bl]);
 
-  if (!data) {
-    return <div style={{ padding: 40 }}>Loading...</div>;
-  }
+  if (!data) return <div style={{ padding: 40 }}>Loading...</div>;
 
+  const canUploadDraft = data.pdf_status === "APPROVED" && !data.draft_invoice_filename;
+  const canSendPaymentLink = !!data.draft_invoice_filename;
+  const canUploadFinal = !!data.payment_proof_filename && !data.final_invoice_filename;
+  const canUploadGate = !!data.final_invoice_filename && !data.gate_pass_filename;
+
+  // ===============================
+  // UPLOAD (SAFE)
+  // ===============================
   const handleUpload = async (
     file: File | null,
     endpoint: string,
@@ -58,24 +147,28 @@ function AdminReviewInner() {
       const res = await fetch(endpoint, {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
 
       const result = await res.json();
 
       if (result.success) {
         reset();
-        fetchData();
+        await fetchData(); // 🔥 force refresh
       } else {
-        alert(result.error || "Upload failed");
+        alert(result.error);
       }
     } catch (err) {
-      console.error("Upload error:", err);
-      alert("Server error during upload");
+      console.error(err);
+      alert("Upload error");
     } finally {
       setLoading(false);
     }
   };
 
+  // ===============================
+  // STATUS UPDATE
+  // ===============================
   const updateStatus = async (status: string) => {
     if (!bl) return;
 
@@ -85,10 +178,11 @@ function AdminReviewInner() {
       const res = await fetch("/api/review-bl", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           bl,
           status,
-          comment: status === "NEED MORE DOCS" ? adminComment : null,
+          comment: adminComment,
         }),
       });
 
@@ -96,18 +190,23 @@ function AdminReviewInner() {
 
       if (result.success) {
         setAdminComment("");
-        fetchData();
+        await fetchData();
       }
     } catch (err) {
-      console.error("Status update error:", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
+  // ===============================
+  // PAYMENT LINK
+  // ===============================
   const sendPaymentLink = async () => {
-    if (!bl || !paymentLink.trim()) {
-      setPaymentMsg("Please enter payment link");
+    const cleanPaymentLink = paymentLink.trim();
+
+    if (!cleanPaymentLink) {
+      setPaymentMsg("Please enter a payment link");
       return;
     }
 
@@ -117,208 +216,117 @@ function AdminReviewInner() {
     try {
       const res = await fetch("/api/set-payment-link", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           bl,
-          payment_link: paymentLink.trim(),
+          payment_link: cleanPaymentLink,
         }),
       });
 
       const result = await res.json();
 
-      if (!res.ok) {
-        setPaymentMsg(result.error || "Failed");
-        return;
+      if (res.ok && result.success) {
+        setPaymentMsg("Sent ✅");
+        setPaymentLink("");
+        await fetchData();
+      } else {
+        setPaymentMsg(result.error || "Failed to send payment link");
       }
-
-      setPaymentMsg("Payment link sent ✅");
-      setPaymentLink("");
-      fetchData();
-
     } catch (err) {
       console.error(err);
-      setPaymentMsg("Server error");
+      setPaymentMsg("Error");
     } finally {
       setLoading(false);
     }
   };
 
-  const renderLink = (url?: string | null, label?: string) => {
-    if (!url || !url.startsWith("http")) {
-      return <p>No File Uploaded</p>;
-    }
-
-    return (
-      <a href={url} target="_blank" rel="noopener noreferrer">
-        {label}
-      </a>
-    );
-  };
-
   return (
     <div className="page-bg">
       <div className="card admin-card">
-
         <h2>Review BL: {data.bl_number}</h2>
+
         <p><strong>Consignee:</strong> {data.consignee}</p>
         <p><strong>Terminal:</strong> {data.terminal}</p>
-
-        <p>
-          <strong>Documents Status:</strong>{" "}
-          {data.pdf_status || "No Documents Uploaded"}
-        </p>
+        <p><strong>Status:</strong> {data.pdf_status}</p>
 
         <div className="admin-grid">
 
           <div className="mini-card">
             <h4>Uploaded Import Documents</h4>
-            {renderLink(data.pdf_filename, "View Uploaded Documents")}
+            <FileLink path={data.pdf_filename} label="View Uploaded Documents" type="pdf" shipmentId={data.id} />
           </div>
 
           <div className="mini-card">
             <h4>Proof of Payment</h4>
-            {renderLink(data.payment_proof_filename, "View Proof of Payment")}
+            <FileLink path={data.payment_proof_filename} label="View Proof of Payment" type="payment" shipmentId={data.id} />
           </div>
 
-          {/* ================= DRAFT INVOICE ================= */}
           <div className="mini-card">
             <h4>Draft Invoice</h4>
+            <FileLink path={data.draft_invoice_filename} label="View Draft Invoice" type="draft" shipmentId={data.id} />
 
-            {renderLink(data.draft_invoice_filename, "View Draft Invoice")}
-
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={(e) =>
-                setDraftFile(e.target.files?.[0] || null)
-              }
-            />
-
-            <button
-              disabled={loading}
-              onClick={() =>
-                handleUpload(
-                  draftFile,
-                  "/api/upload-draft-invoice",
-                  () => setDraftFile(null)
-                )
-              }
-            >
-              Upload / Replace Draft
+            <input disabled={!canUploadDraft} type="file" onChange={(e) => setDraftFile(e.target.files?.[0] || null)} />
+            <button disabled={!canUploadDraft} onClick={() => handleUpload(draftFile, "/api/upload-draft-invoice", () => setDraftFile(null))}>
+              Upload Draft
             </button>
 
-            {/* ===== PAYMENT LINK ===== */}
             <input
-              placeholder="Paste payment link here"
+              disabled={!canSendPaymentLink}
+              placeholder="Payment link"
               value={paymentLink}
               onChange={(e) => setPaymentLink(e.target.value)}
-              style={{ marginTop: "10px" }}
             />
 
-            <button
-              disabled={loading}
-              style={{ background: "#16a34a", marginTop: "6px" }}
-              onClick={sendPaymentLink}
-            >
+            <button disabled={!canSendPaymentLink} onClick={sendPaymentLink}>
               Send Payment Link
             </button>
 
-            {paymentMsg && (
-              <p style={{ marginTop: 6, fontSize: 13 }}>
-                {paymentMsg}
-              </p>
-            )}
+            {paymentMsg && <p>{paymentMsg}</p>}
           </div>
 
-          {/* ================= FINAL ================= */}
           <div className="mini-card">
             <h4>Final Invoice</h4>
-            {renderLink(data.final_invoice_filename, "View Final Invoice")}
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={(e) =>
-                setFinalFile(e.target.files?.[0] || null)
-              }
-            />
-            <button
-              disabled={loading}
-              onClick={() =>
-                handleUpload(
-                  finalFile,
-                  "/api/upload-final-invoice",
-                  () => setFinalFile(null)
-                )
-              }
-            >
-              Upload Final Invoice
+            <FileLink path={data.final_invoice_filename} label="View Final Invoice" type="final" shipmentId={data.id} />
+
+            <input disabled={!canUploadFinal} type="file" onChange={(e) => setFinalFile(e.target.files?.[0] || null)} />
+            <button disabled={!canUploadFinal} onClick={() => handleUpload(finalFile, "/api/upload-final-invoice", () => setFinalFile(null))}>
+              Upload Final
             </button>
           </div>
 
-          {/* ================= GATE ================= */}
           <div className="mini-card">
             <h4>Gate Slip</h4>
-            {renderLink(data.gate_pass_filename, "View Gate Slip")}
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={(e) =>
-                setGateFile(e.target.files?.[0] || null)
-              }
-            />
-            <button
-              disabled={loading}
-              onClick={() =>
-                handleUpload(
-                  gateFile,
-                  "/api/upload-gate-slip",
-                  () => setGateFile(null)
-                )
-              }
-            >
-              Upload Gate Slip
+            <FileLink path={data.gate_pass_filename} label="View Gate Slip" type="gate" shipmentId={data.id} />
+
+            <input disabled={!canUploadGate} type="file" onChange={(e) => setGateFile(e.target.files?.[0] || null)} />
+            <button disabled={!canUploadGate} onClick={() => handleUpload(gateFile, "/api/upload-gate-slip", () => setGateFile(null))}>
+              Upload Gate
             </button>
           </div>
 
         </div>
 
-        <div style={{ marginTop: 30 }}>
-          <button disabled={loading} onClick={() => updateStatus("APPROVED")}>
-            Approve
-          </button>
+        <button onClick={() => updateStatus("APPROVED")}>
+          Approve
+        </button>
 
-          <div style={{ marginTop: 15 }}>
-            <textarea
-              placeholder="Write required documents or comments here..."
-              value={adminComment}
-              onChange={(e) => setAdminComment(e.target.value)}
-              style={{
-                width: "100%",
-                padding: 10,
-                borderRadius: 8,
-                border: "1px solid #ccc",
-                minHeight: 80,
-                marginBottom: 10
-              }}
-            />
+        <textarea
+          placeholder="Write comment..."
+          value={adminComment}
+          onChange={(e) => setAdminComment(e.target.value)}
+        />
 
-            <button
-              disabled={loading}
-              style={{ background: "#d97706" }}
-              onClick={() => updateStatus("NEED MORE DOCS")}
-            >
-              Need More Docs
-            </button>
-          </div>
-        </div>
+        <button onClick={() => updateStatus("NEED MORE DOCS")}>
+          Need More Docs
+        </button>
 
       </div>
     </div>
   );
 }
 
+// ===============================
 export default function AdminReviewPage() {
   return (
     <Suspense fallback={<div style={{ padding: 40 }}>Loading...</div>}>

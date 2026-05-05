@@ -4,7 +4,7 @@ import { verifyAdmin } from "@/lib/adminGuard";
 
 export async function GET(req: NextRequest) {
 
-  const admin = verifyAdmin(req);
+  const admin = await verifyAdmin(req);
 
   if (!admin) {
     return NextResponse.json(

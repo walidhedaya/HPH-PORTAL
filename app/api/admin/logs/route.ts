@@ -4,7 +4,7 @@ import { verifyAdmin } from "@/lib/adminGuard";
 
 export async function GET(req: NextRequest) {
 
-  const admin = verifyAdmin(req);
+  const admin = await verifyAdmin(req);
 
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -98,5 +98,3 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// force git diff
-const __force_update_logs_filters = true;

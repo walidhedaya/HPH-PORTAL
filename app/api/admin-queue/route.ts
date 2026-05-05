@@ -1,14 +1,15 @@
-import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import db from "@/lib/db";
 import { verifyAdmin } from "@/lib/adminGuard";
 
 export async function GET(req: NextRequest) {
 
   // ===============================
-  // ADMIN SECURITY CHECK
+  // 🔐 ADMIN AUTH
   // ===============================
-  if (!verifyAdmin(req)) {
+  const admin = await verifyAdmin(req);
+
+  if (!admin) {
     return NextResponse.json(
       { error: "Unauthorized" },
       { status: 403 }
@@ -18,15 +19,31 @@ export async function GET(req: NextRequest) {
   try {
 
     const { searchParams } = new URL(req.url);
-    const terminal = searchParams.get("terminal");
 
-    if (!terminal) {
+    const terminalRaw = searchParams.get("terminal");
+    const limitRaw = searchParams.get("limit");
+    const cursor = searchParams.get("cursor");
+
+    if (!terminalRaw) {
       return NextResponse.json({ success: false });
     }
 
-    const { rows } = await db.query(
-      `
+    const terminal = String(terminalRaw).trim();
+
+    // 🔐 basic validation
+    if (terminal.length > 50) {
+      return NextResponse.json(
+        { error: "Invalid terminal" },
+        { status: 400 }
+      );
+    }
+
+    // 🔥 pagination
+    const limit = Math.min(Number(limitRaw) || 50, 100);
+
+    let query = `
       SELECT 
+        id,
         bl_number,
         terminal,
         pdf_status,
@@ -44,6 +61,27 @@ export async function GET(req: NextRequest) {
         created_at
       FROM shipments
       WHERE LOWER(terminal) = LOWER($1)
+    `;
+
+    const values: any[] = [terminal];
+    let index = 2;
+
+    // 🔥 keyset pagination
+    if (cursor) {
+      query += `
+        AND COALESCE(
+          gate_pass_uploaded_at,
+          final_invoice_uploaded_at,
+          payment_uploaded_at,
+          draft_invoice_uploaded_at,
+          pdf_uploaded_at,
+          created_at
+        ) < $${index++}
+      `;
+      values.push(cursor);
+    }
+
+    query += `
       ORDER BY 
         COALESCE(
           gate_pass_uploaded_at,
@@ -53,9 +91,12 @@ export async function GET(req: NextRequest) {
           pdf_uploaded_at,
           created_at
         ) DESC
-      `,
-      [terminal]
-    );
+      LIMIT $${index}
+    `;
+
+    values.push(limit);
+
+    const { rows } = await db.query(query, values);
 
     const data = rows.map((row: any) => {
 
@@ -92,11 +133,12 @@ export async function GET(req: NextRequest) {
         timestamp: lastTime,
         handling_admin: row.handling_admin || "-",
       };
-
     });
 
     return NextResponse.json({
       success: true,
+      count: data.length,
+      next_cursor: data.length ? data[data.length - 1].timestamp : null,
       data,
     });
 

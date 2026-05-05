@@ -13,7 +13,7 @@ export default function AdminLayout({
   useEffect(() => {
     const role = localStorage.getItem("role");
 
-    if (!role || role !== "admin") {
+    if (role !== "admin" && role !== "super_admin") {
       router.push("/login");
     }
   }, [router]);

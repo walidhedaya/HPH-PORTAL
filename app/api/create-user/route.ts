@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import db from "@/lib/db";
 import { verifyAdmin } from "@/lib/adminGuard";
+import { ensureUserAccessSchema } from "@/lib/dbInit";
 
 export async function POST(req: NextRequest) {
 
@@ -87,6 +88,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    await ensureUserAccessSchema();
 
     // ===============================
     // Check existing user

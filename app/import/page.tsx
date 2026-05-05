@@ -15,7 +15,7 @@ type Shipment = {
   final_invoice_filename?: string | null;
   payment_proof_filename?: string | null;
   gate_pass_filename?: string | null;
-  payment_link?: string | null; // ✅ NEW
+  payment_link?: string | null;
 };
 
 const translations = {
@@ -25,7 +25,7 @@ const translations = {
     uploadPDF: "Upload Documents",
     draft: "Download Draft Invoice",
     uploadPayment: "Upload Payment Proof",
-    pay: "PAY", // ✅ NEW
+    pay: "PAY",
     final: "Download Final Invoice",
     gate: "Download Gate Slip",
     appointment: "Book Appointment",
@@ -35,8 +35,7 @@ const translations = {
       "Delivery Order - Shipping Line Release Letter - Stamped Bill of Lading - Final Customs Release",
     notFound: "BL not found for selected terminal",
     underReview: "Documents Under Review",
-    approved:
-      "Approved – Please wait for draft invoice",
+    approved: "Approved – Please wait for draft invoice",
     needMore: "More Documents Required",
   },
   ar: {
@@ -45,7 +44,7 @@ const translations = {
     uploadPDF: "رفع المستندات",
     draft: "تحميل الفاتورة المبدئية",
     uploadPayment: "رفع إثبات الدفع",
-    pay: "الدفع", // ✅ NEW
+    pay: "الدفع",
     final: "تحميل الفاتورة النهائية",
     gate: "تحميل إذن الخروج",
     appointment: "حجز موعد",
@@ -55,8 +54,7 @@ const translations = {
       "إذن التسليم - خطاب الإفراج من الخط الملاحي - بوليصة الشحن مختومة - الإفراج الجمركى النهائى",
     notFound: "البوليصة غير موجودة في المحطة المختارة",
     underReview: "المستندات قيد المراجعة",
-    approved:
-      "تم اعتماد المستندات – برجاء انتظار الفاتورة المبدئية",
+    approved: "تم اعتماد المستندات – برجاء انتظار الفاتورة المبدئية",
     needMore: "مطلوب مستندات إضافية",
   },
 };
@@ -146,13 +144,40 @@ export default function ImportPage() {
     return active ? "btn-active" : "btn-disabled";
   }
 
-  function openFile(url?: string | null) {
-    if (!url) return;
-    window.open(url, "_blank");
+  // 🔐 SECURE FILE ACCESS
+  async function openFile(
+    type: "pdf" | "draft" | "final" | "payment" | "gate"
+  ) {
+    if (!shipment?.id) return;
+
+    try {
+      const res = await fetch(
+        `/api/files/get?shipment_id=${shipment.id}&type=${type}`
+      );
+
+      const data = await res.json();
+
+      if (!data.success || !data.url) {
+        alert("File not available");
+        return;
+      }
+
+      window.open(data.url, "_blank");
+    } catch (err) {
+      console.error("OPEN FILE ERROR:", err);
+      alert("Error opening file");
+    }
   }
 
+  // 🔐 SECURE PAYMENT LINK
   function openPayment() {
     if (!shipment?.payment_link) return;
+
+    if (!shipment.payment_link.startsWith("https://")) {
+      alert("Invalid payment link");
+      return;
+    }
+
     window.open(shipment.payment_link, "_blank");
   }
 
@@ -265,16 +290,13 @@ export default function ImportPage() {
                     !!shipment.draft_invoice_filename
                   )}
                   disabled={!shipment.draft_invoice_filename}
-                  onClick={() =>
-                    openFile(shipment.draft_invoice_filename)
-                  }
+                  onClick={() => openFile("draft")}
                 >
                   {shipment.draft_invoice_filename
                     ? t.draft
                     : "Waiting for Draft"}
                 </button>
 
-                {/* ✅ PAY BUTTON */}
                 <button
                   style={{ marginTop: 10 }}
                   className={btnClass(
@@ -336,9 +358,7 @@ export default function ImportPage() {
                     !!shipment.final_invoice_filename
                   )}
                   disabled={!shipment.final_invoice_filename}
-                  onClick={() =>
-                    openFile(shipment.final_invoice_filename)
-                  }
+                  onClick={() => openFile("final")}
                 >
                   {shipment.final_invoice_filename
                     ? t.final
@@ -354,9 +374,7 @@ export default function ImportPage() {
                     !!shipment.gate_pass_filename
                   )}
                   disabled={!shipment.gate_pass_filename}
-                  onClick={() =>
-                    openFile(shipment.gate_pass_filename)
-                  }
+                  onClick={() => openFile("gate")}
                 >
                   {shipment.gate_pass_filename
                     ? t.gate

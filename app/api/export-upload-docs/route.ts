@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { verifyUser } from "@/lib/authGuard";
+import { safeStorageName } from "@/lib/security";
 
 export async function POST(req: NextRequest) {
 
   // ===============================
   // USER SECURITY CHECK
   // ===============================
-  if (!verifyUser(req)) {
+  const user = await verifyUser(req);
+
+  if (!user) {
     return NextResponse.json(
       { error: "Unauthorized" },
       { status: 401 }
@@ -32,6 +35,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (file.size === 0 || file.size > 10 * 1024 * 1024) {
+      return NextResponse.json(
+        { success: false, message: "Invalid file size (max 10MB)" },
+        { status: 400 }
+      );
+    }
+
     const now = new Date();
     const timestamp = now
       .toISOString()
@@ -39,10 +49,24 @@ export async function POST(req: NextRequest) {
       .replace("T", "_")
       .split(".")[0];
 
-    const fileName = `${booking}_${timestamp}.pdf`;
+    const fileName = `${safeStorageName(booking)}_${timestamp}.pdf`;
     const storagePath = `export-documents/${fileName}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    const isPDF =
+      buffer.length > 4 &&
+      buffer[0] === 0x25 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x44 &&
+      buffer[3] === 0x46;
+
+    if (!isPDF) {
+      return NextResponse.json(
+        { success: false, message: "Invalid PDF file" },
+        { status: 400 }
+      );
+    }
 
     // ===============================
     // Upload to Supabase
@@ -51,7 +75,7 @@ export async function POST(req: NextRequest) {
       .from("documents")
       .upload(storagePath, buffer, {
         contentType: "application/pdf",
-        upsert: true,
+        upsert: false,
       });
 
     if (error) {
@@ -61,12 +85,6 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-
-    const { data } = supabase.storage
-      .from("documents")
-      .getPublicUrl(storagePath);
-
-    const publicUrl = data.publicUrl;
 
     // ===============================
     // UPDATE (PostgreSQL style)
@@ -83,7 +101,7 @@ export async function POST(req: NextRequest) {
       WHERE LOWER(booking_number) = LOWER($6)
       `,
       [
-        publicUrl,
+        storagePath,
         now.toISOString(),
         stuffing === "1" ? 1 : 0,
         inspection === "1" ? 1 : 0,

@@ -1,15 +1,17 @@
-import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import db from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { verifyAdmin } from "@/lib/adminGuard";
+import { safeStorageName } from "@/lib/security";
 
 export async function POST(req: NextRequest) {
 
   // ===============================
-  // ADMIN SECURITY CHECK
+  // 🔐 ADMIN AUTH
   // ===============================
-  if (!verifyAdmin(req)) {
+  const admin = await verifyAdmin(req);
+
+  if (!admin) {
     return NextResponse.json(
       { error: "Unauthorized" },
       { status: 403 }
@@ -33,43 +35,93 @@ export async function POST(req: NextRequest) {
     const bl = blRaw.trim().toUpperCase();
     const now = new Date();
 
-    const timestamp = now
-      .toISOString()
-      .replace(/:/g, "-")
-      .replace("T", "_")
-      .split(".")[0];
-
-    const filename = `${bl}_FINAL_${timestamp}.pdf`;
-    const filePath = `final/${filename}`;
+    // ===============================
+    // 🔐 FILE VALIDATION
+    // ===============================
+    if (file.size === 0 || file.size > 10 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: "File too large (max 10MB)" },
+        { status: 400 }
+      );
+    }
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
+    const isPDF =
+      buffer[0] === 0x25 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x44 &&
+      buffer[3] === 0x46;
+
+    if (!isPDF) {
+      return NextResponse.json(
+        { error: "Invalid PDF file" },
+        { status: 400 }
+      );
+    }
+
     // ===============================
-    // Upload to Supabase
+    // 📦 GET LATEST SHIPMENT
     // ===============================
+    const shipmentRes = await db.query(
+      `
+      SELECT id, payment_proof_filename, final_invoice_filename
+      FROM shipments
+      WHERE LOWER(bl_number) = LOWER($1)
+      ORDER BY created_at DESC
+      LIMIT 1
+      `,
+      [bl]
+    );
+
+    if (shipmentRes.rowCount === 0) {
+      return NextResponse.json(
+        { error: "BL not found" },
+        { status: 404 }
+      );
+    }
+
+    const shipment = shipmentRes.rows[0];
+    const shipmentId = shipment.id;
+
+    if (!shipment.payment_proof_filename) {
+      return NextResponse.json(
+        { error: "Payment proof must be uploaded before final invoice" },
+        { status: 409 }
+      );
+    }
+
+    if (shipment.final_invoice_filename) {
+      return NextResponse.json(
+        { error: "Final invoice already uploaded" },
+        { status: 409 }
+      );
+    }
+
+    // ===============================
+    // 📁 STORAGE (PRIVATE)
+    // ===============================
+    const filename = `${safeStorageName(bl)}_FINAL_${Date.now()}.pdf`;
+    const storagePath = `final/${filename}`;
+
     const { error } = await supabase.storage
       .from("documents")
-      .upload(filePath, buffer, {
+      .upload(storagePath, buffer, {
         contentType: "application/pdf",
-        upsert: true,
+        upsert: false,
       });
 
     if (error) {
       console.error("Supabase upload error:", error);
+
       return NextResponse.json(
         { error: "Upload failed" },
         { status: 500 }
       );
     }
 
-    const { data } = supabase.storage
-      .from("documents")
-      .getPublicUrl(filePath);
-
-    const publicUrl = data.publicUrl;
-
     // ===============================
-    // UPDATE (Postgres)
+    // 🔥 UPDATE DB (STORE PATH ONLY)
     // ===============================
     await db.query(
       `
@@ -77,18 +129,36 @@ export async function POST(req: NextRequest) {
       SET
         final_invoice_filename = $1,
         final_invoice_uploaded_at = $2
-      WHERE LOWER(bl_number) = LOWER($3)
+      WHERE id = $3
       `,
       [
-        publicUrl,
+        storagePath,
         now.toISOString(),
-        bl
+        shipmentId
+      ]
+    );
+
+    // ===============================
+    // 🧾 ADMIN LOG
+    // ===============================
+    await db.query(
+      `
+      INSERT INTO admin_actions_log
+      (shipment_id, bl_number, action_type, action_status, admin_id)
+      VALUES ($1, $2, $3, $4, $5)
+      `,
+      [
+        shipmentId,
+        bl,
+        "UPLOAD_FINAL_INVOICE",
+        "SUCCESS",
+        admin.id
       ]
     );
 
     return NextResponse.json({
       success: true,
-      url: publicUrl,
+      path: storagePath,
     });
 
   } catch (err) {
@@ -99,6 +169,5 @@ export async function POST(req: NextRequest) {
       { error: "Server error" },
       { status: 500 }
     );
-
   }
 }

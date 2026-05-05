@@ -30,6 +30,24 @@ export default function ExportEntryPage() {
     return active ? "btn-active" : "btn-disabled";
   }
 
+  async function downloadFile(fileType: "export_docs" | "draft" | "final" | "gate") {
+    if (!shipment) return;
+    
+    try {
+      const res = await fetch(`/api/files/get?shipment_id=${shipment.id}&type=${fileType}`);
+      const data = await res.json();
+      
+      if (data.success && data.url) {
+        window.open(data.url, "_blank");
+      } else {
+        alert("Failed to download file");
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+      alert("Error downloading file");
+    }
+  }
+
   async function startProcess() {
     if (!booking) return;
 
@@ -166,6 +184,15 @@ export default function ExportEntryPage() {
                   ? "Documents Uploaded"
                   : "Upload Documents"}
               </button>
+
+              {shipment.export_docs_filename && (
+                <button
+                  style={{ marginTop: 10 }}
+                  onClick={() => downloadFile("export_docs")}
+                >
+                  Download Documents
+                </button>
+              )}
             </div>
 
             {/* Draft */}
@@ -177,15 +204,10 @@ export default function ExportEntryPage() {
                   !!shipment.draft_invoice_filename
                 )}
                 disabled={!shipment.draft_invoice_filename}
-                onClick={() =>
-                  window.open(
-                    shipment.draft_invoice_filename!,
-                    "_blank"
-                  )
-                }
+                onClick={() => downloadFile("draft")}
               >
                 {shipment.draft_invoice_filename
-                  ? "Draft Downloaded"
+                  ? "Download Draft"
                   : "Download Draft"}
               </button>
             </div>
@@ -229,15 +251,10 @@ export default function ExportEntryPage() {
                   !!shipment.final_invoice_filename
                 )}
                 disabled={!shipment.final_invoice_filename}
-                onClick={() =>
-                  window.open(
-                    shipment.final_invoice_filename!,
-                    "_blank"
-                  )
-                }
+                onClick={() => downloadFile("final")}
               >
                 {shipment.final_invoice_filename
-                  ? "Final Downloaded"
+                  ? "Download Final"
                   : "Download Final"}
               </button>
             </div>
@@ -251,15 +268,10 @@ export default function ExportEntryPage() {
                   !!shipment.gate_pass_filename
                 )}
                 disabled={!shipment.gate_pass_filename}
-                onClick={() =>
-                  window.open(
-                    shipment.gate_pass_filename!,
-                    "_blank"
-                  )
-                }
+                onClick={() => downloadFile("gate")}
               >
                 {shipment.gate_pass_filename
-                  ? "Gate Downloaded"
+                  ? "Download Gate"
                   : "Download Gate"}
               </button>
             </div>

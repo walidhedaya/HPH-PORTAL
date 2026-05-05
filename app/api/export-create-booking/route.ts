@@ -7,7 +7,9 @@ export async function POST(req: NextRequest) {
   // ===============================
   // USER SECURITY CHECK
   // ===============================
-  if (!verifyUser(req)) {
+  const user = await verifyUser(req);
+
+  if (!user) {
     return NextResponse.json(
       { error: "Unauthorized" },
       { status: 401 }
@@ -27,6 +29,19 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanBooking = String(booking_number).trim();
+    const cleanTaxId = String(tax_id || "").trim();
+    const cleanTerminal = String(terminal || "").trim();
+
+    if (
+      cleanBooking.length > 80 ||
+      cleanTaxId.length > 50 ||
+      cleanTerminal.length > 50
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Invalid booking data" },
+        { status: 400 }
+      );
+    }
 
     // ===============================
     // Check if booking already exists
@@ -59,8 +74,8 @@ export async function POST(req: NextRequest) {
       `,
       [
         cleanBooking,
-        tax_id || "",
-        terminal || "",
+        cleanTaxId,
+        cleanTerminal,
         "ENTRY",
         now,
       ]

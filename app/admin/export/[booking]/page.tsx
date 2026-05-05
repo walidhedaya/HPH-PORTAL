@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 type ExportShipment = {
+  id: number;
   booking_number: string;
   terminal: string;
   tax_id: string;
@@ -44,6 +45,24 @@ export default function AdminExportDetailsPage() {
   function btnClass(active: boolean, done: boolean) {
     if (done) return "btn-done";
     return active ? "btn-active" : "btn-disabled";
+  }
+
+  async function downloadFile(fileType: "pdf" | "export_docs" | "draft" | "payment" | "final" | "gate") {
+    if (!shipment) return;
+    
+    try {
+      const res = await fetch(`/api/files/get?shipment_id=${shipment.id}&type=${fileType}`);
+      const data = await res.json();
+      
+      if (data.success && data.url) {
+        window.open(data.url, "_blank");
+      } else {
+        alert("Failed to download file");
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+      alert("Error downloading file");
+    }
   }
 
   async function uploadDraft() {
@@ -121,10 +140,10 @@ export default function AdminExportDetailsPage() {
             <button
               className={btnClass(!!shipment.export_docs_filename, !!shipment.export_docs_filename)}
               disabled={!shipment.export_docs_filename}
-              onClick={() => window.open(shipment.export_docs_filename!, "_blank")}
+              onClick={() => downloadFile("export_docs")}
             >
               {shipment.export_docs_filename
-                ? "Documents Downloaded"
+                ? "Download Documents"
                 : "Download Documents"}
             </button>
           </div>
@@ -152,9 +171,7 @@ export default function AdminExportDetailsPage() {
             {shipment.draft_invoice_filename && (
               <button
                 style={{ marginTop: 10 }}
-                onClick={() =>
-                  window.open(shipment.draft_invoice_filename!, "_blank")
-                }
+                onClick={() => downloadFile("draft")}
               >
                 Download Draft
               </button>
@@ -167,12 +184,10 @@ export default function AdminExportDetailsPage() {
             <button
               className={btnClass(!!shipment.payment_proof_filename, !!shipment.payment_proof_filename)}
               disabled={!shipment.payment_proof_filename}
-              onClick={() =>
-                window.open(shipment.payment_proof_filename!, "_blank")
-              }
+              onClick={() => downloadFile("payment")}
             >
               {shipment.payment_proof_filename
-                ? "Payment Downloaded"
+                ? "Download Payment"
                 : "Download Payment"}
             </button>
           </div>
@@ -200,9 +215,7 @@ export default function AdminExportDetailsPage() {
             {shipment.final_invoice_filename && (
               <button
                 style={{ marginTop: 10 }}
-                onClick={() =>
-                  window.open(shipment.final_invoice_filename!, "_blank")
-                }
+                onClick={() => downloadFile("final")}
               >
                 Download Final
               </button>
@@ -232,9 +245,7 @@ export default function AdminExportDetailsPage() {
             {shipment.gate_pass_filename && (
               <button
                 style={{ marginTop: 10 }}
-                onClick={() =>
-                  window.open(shipment.gate_pass_filename!, "_blank")
-                }
+                onClick={() => downloadFile("gate")}
               >
                 Download Gate
               </button>

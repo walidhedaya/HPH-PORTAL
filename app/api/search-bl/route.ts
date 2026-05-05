@@ -12,14 +12,14 @@ export async function GET(req: NextRequest) {
     const terminal = searchParams.get("terminal");
 
     // ===============================
-    // 🔐 ADMIN FLOW (ISOLATED)
+    // 🔐 ADMIN FLOW
     // ===============================
     const admin = await verifyAdmin(req);
 
     if (admin) {
       if (!bl) {
         return NextResponse.json(
-          { error: "BL is required for admin search" },
+          { error: "BL is required" },
           { status: 400 }
         );
       }
@@ -32,9 +32,23 @@ export async function GET(req: NextRequest) {
           tax_id,
           terminal,
           consignee,
-          pdf_status
+          pdf_status,
+          admin_comment,
+
+          -- 🔥 FILES
+          pdf_filename,
+          payment_proof_filename,
+          draft_invoice_filename,
+          final_invoice_filename,
+          gate_pass_filename,
+
+          -- 🔥 CRITICAL FIX
+          payment_link
+
         FROM shipments
         WHERE LOWER(bl_number) = LOWER($1)
+        ORDER BY created_at DESC
+        LIMIT 1
         `,
         [bl]
       );
@@ -86,18 +100,31 @@ export async function GET(req: NextRequest) {
           terminal,
           consignee,
           pdf_status,
-          admin_comment
+          admin_comment,
+
+          -- 🔥 FILES
+          pdf_filename,
+          payment_proof_filename,
+          draft_invoice_filename,
+          final_invoice_filename,
+          gate_pass_filename,
+
+          -- 🔥 CRITICAL FIX
+          payment_link
+
         FROM shipments s
         WHERE LOWER(terminal) = LOWER($1)
         AND LOWER(bl_number) = LOWER($2)
-        AND EXISTS (
+        AND ($3::boolean OR EXISTS (
           SELECT 1
           FROM user_tax_access uta
-          WHERE uta.user_id = $3
+          WHERE uta.user_id = $4
           AND LOWER(uta.tax_id) = LOWER(s.tax_id)
-        )
+        ))
+        ORDER BY created_at DESC
+        LIMIT 1
         `,
-        [terminal, bl, user.id]
+        [terminal, bl, user.full_access === true, user.id]
       );
 
       return NextResponse.json({
@@ -119,18 +146,30 @@ export async function GET(req: NextRequest) {
           terminal,
           consignee,
           pdf_status,
-          admin_comment
+          admin_comment,
+
+          -- 🔥 FILES
+          pdf_filename,
+          payment_proof_filename,
+          draft_invoice_filename,
+          final_invoice_filename,
+          gate_pass_filename,
+
+          -- 🔥 CRITICAL FIX
+          payment_link
+
         FROM shipments s
         WHERE LOWER(terminal) = LOWER($1)
         AND LOWER(tax_id) = LOWER($2)
-        AND EXISTS (
+        AND ($3::boolean OR EXISTS (
           SELECT 1
           FROM user_tax_access uta
-          WHERE uta.user_id = $3
+          WHERE uta.user_id = $4
           AND LOWER(uta.tax_id) = LOWER($2)
-        )
+        ))
+        ORDER BY created_at DESC
         `,
-        [terminal, taxId, user.id]
+        [terminal, taxId, user.full_access === true, user.id]
       );
 
       return NextResponse.json({

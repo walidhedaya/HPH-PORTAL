@@ -1,10 +1,13 @@
-import "dotenv/config"; // load .env variables
+import { config } from "dotenv";
 
-import pool from "./db";
 import bcrypt from "bcryptjs";
+
+config({ path: ".env.local" });
+config();
 
 const ADMIN_TAX_ID = "999999999";
 const ADMIN_PASSWORD = "admin123";
+const ADMIN_ROLE = "super_admin";
 
 type UserRow = {
   id: number;
@@ -12,8 +15,14 @@ type UserRow = {
 
 async function seed() {
   try {
+    const { default: pool } = await import("./db");
 
     console.log("🌱 Seeding admin user...");
+
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS full_access BOOLEAN DEFAULT false
+    `);
 
     // hash password
     const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
@@ -29,14 +38,15 @@ async function seed() {
       // create admin
       await pool.query(
         `
-        INSERT INTO users (tax_id, password, role, created_at)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO users (tax_id, password, role, created_at, full_access)
+        VALUES ($1, $2, $3, $4, $5)
         `,
         [
           ADMIN_TAX_ID,
           hash,
-          "admin",
+          ADMIN_ROLE,
           new Date().toISOString(),
+          true,
         ]
       );
 
@@ -48,12 +58,13 @@ async function seed() {
       await pool.query(
         `
         UPDATE users
-        SET password = $1, role = $2
-        WHERE tax_id = $3
+        SET password = $1, role = $2, full_access = $3
+        WHERE tax_id = $4
         `,
         [
           hash,
-          "admin",
+          ADMIN_ROLE,
+          true,
           ADMIN_TAX_ID,
         ]
       );

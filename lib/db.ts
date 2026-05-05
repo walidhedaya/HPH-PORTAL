@@ -1,10 +1,19 @@
 import { Pool } from "pg";
 
+function shouldUseSsl() {
+  const databaseUrl = process.env.DATABASE_URL || "";
+
+  if (databaseUrl.includes("sslmode=require")) return true;
+  if (databaseUrl.includes("localhost") || databaseUrl.includes("127.0.0.1")) {
+    return false;
+  }
+
+  return process.env.NODE_ENV === "production";
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: shouldUseSsl() ? { rejectUnauthorized: false } : false,
 });
 
 async function init() {
@@ -46,6 +55,9 @@ async function init() {
 
         payment_proof_filename TEXT,
         payment_uploaded_at TEXT,
+
+        payment_link TEXT,
+        payment_link_set_at TIMESTAMPTZ,
 
         gate_pass_filename TEXT,
         gate_pass_uploaded_at TEXT,

@@ -28,6 +28,11 @@ export default function AdminImportPage() {
   const [fullAccess, setFullAccess] = useState(false);
   const [allowedTaxIds, setAllowedTaxIds] = useState("");
   const [userMsg, setUserMsg] = useState<string | null>(null);
+  const [editTaxId, setEditTaxId] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editConfirm, setEditConfirm] = useState("");
+  const [editAllowedTaxIds, setEditAllowedTaxIds] = useState("");
+  const [editUserMsg, setEditUserMsg] = useState<string | null>(null);
 
   const terminal =
     typeof window !== "undefined"
@@ -37,7 +42,7 @@ export default function AdminImportPage() {
   // TEMP UI GUARD (real protection = middleware)
   useEffect(() => {
     const storedRole = localStorage.getItem("role");
-    if (!storedRole || storedRole !== "admin") {
+    if (storedRole !== "admin" && storedRole !== "super_admin") {
       router.push("/login");
     }
   }, [router]);
@@ -168,6 +173,64 @@ export default function AdminImportPage() {
     setFullAccess(false);
   };
 
+  // EDIT USER
+  const handleEditUser = async () => {
+    setEditUserMsg(null);
+
+    if (!editTaxId.trim()) {
+      setEditUserMsg("Tax ID is required");
+      return;
+    }
+
+    if (!editPassword && !editAllowedTaxIds.trim()) {
+      setEditUserMsg("Enter a new password or tax IDs to add");
+      return;
+    }
+
+    if (editPassword !== editConfirm) {
+      setEditUserMsg("Passwords do not match");
+      return;
+    }
+
+    const res = await fetch("/api/edit-user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tax_id: editTaxId.trim(),
+        password: editPassword,
+        allowed_tax_ids: editAllowedTaxIds
+          .split(",")
+          .map(t => t.trim())
+          .filter(Boolean),
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setEditUserMsg(data.error || "Failed to edit user");
+      return;
+    }
+
+    const parts = [];
+
+    if (data.password_updated) parts.push("password updated");
+    if (data.added_tax_ids > 0) {
+      parts.push(`${data.added_tax_ids} tax ID(s) added`);
+    }
+    if (editAllowedTaxIds.trim() && data.added_tax_ids === 0) {
+      parts.push("no new tax IDs added");
+    }
+
+    setEditUserMsg(`User updated: ${parts.join(", ")}`);
+    setEditTaxId("");
+    setEditPassword("");
+    setEditConfirm("");
+    setEditAllowedTaxIds("");
+  };
+
   // LOGOUT
   const handleLogout = async () => {
     try {
@@ -285,6 +348,42 @@ export default function AdminImportPage() {
             </button>
 
             {userMsg && <p>{userMsg}</p>}
+          </div>
+
+          <div className="mini-card">
+            <h4>Edit User</h4>
+
+            <input
+              placeholder="Existing User Tax ID"
+              value={editTaxId}
+              onChange={e => setEditTaxId(e.target.value)}
+            />
+
+            <input
+              type="password"
+              placeholder="New Password"
+              value={editPassword}
+              onChange={e => setEditPassword(e.target.value)}
+            />
+
+            <input
+              type="password"
+              placeholder="Confirm New Password"
+              value={editConfirm}
+              onChange={e => setEditConfirm(e.target.value)}
+            />
+
+            <input
+              placeholder="Tax IDs to Add (comma separated)"
+              value={editAllowedTaxIds}
+              onChange={e => setEditAllowedTaxIds(e.target.value)}
+            />
+
+            <button onClick={handleEditUser}>
+              Update User
+            </button>
+
+            {editUserMsg && <p>{editUserMsg}</p>}
           </div>
 
         </div>

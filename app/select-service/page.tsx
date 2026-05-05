@@ -55,7 +55,7 @@ export default function SelectServicePage() {
 
     if (!role) return;
 
-    if (role === "admin") {
+    if (role === "admin" || role === "super_admin") {
       router.push(`/admin/${service}`);
     } else {
       router.push(`/${service}`);

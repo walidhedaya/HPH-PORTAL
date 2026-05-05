@@ -4,7 +4,7 @@ import { verifyAdmin } from "@/lib/adminGuard";
 
 export async function GET(req: NextRequest) {
 
-  const admin = verifyAdmin(req);
+  const admin = await verifyAdmin(req);
 
   if (!admin) {
     return NextResponse.json(
@@ -15,8 +15,10 @@ export async function GET(req: NextRequest) {
 
   try {
 
+    // 🔥 only latest row per BL
     const { rows } = await db.query(`
-      SELECT
+      SELECT DISTINCT ON (LOWER(bl_number))
+        id,
         bl_number,
         tax_id,
         terminal,
@@ -25,7 +27,7 @@ export async function GET(req: NextRequest) {
         pdf_status
       FROM shipments
       WHERE pdf_status = 'UNDER REVIEW'
-      ORDER BY pdf_uploaded_at DESC
+      ORDER BY LOWER(bl_number), created_at DESC
     `);
 
     return NextResponse.json({

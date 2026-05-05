@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { verifyAdmin } from "@/lib/adminGuard";
+import { safeStorageName } from "@/lib/security";
 
 export async function POST(req: NextRequest) {
 
-  const admin = verifyAdmin(req);
+  const admin = await verifyAdmin(req);
 
   if (!admin) {
     return NextResponse.json(
@@ -27,18 +28,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (file.size === 0 || file.size > 10 * 1024 * 1024) {
+      return NextResponse.json(
+        { success: false, message: "Invalid file size (max 10MB)" },
+        { status: 400 }
+      );
+    }
+
     const now = new Date();
 
-    const fileName = `${booking}_${Date.now()}.pdf`;
+    const fileName = `${safeStorageName(booking)}_${Date.now()}.pdf`;
     const storagePath = `export-draft/${fileName}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    const isPDF =
+      buffer.length > 4 &&
+      buffer[0] === 0x25 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x44 &&
+      buffer[3] === 0x46;
+
+    if (!isPDF) {
+      return NextResponse.json(
+        { success: false, message: "Invalid PDF file" },
+        { status: 400 }
+      );
+    }
 
     const { error } = await supabase.storage
       .from("documents")
       .upload(storagePath, buffer, {
         contentType: "application/pdf",
-        upsert: true,
+        upsert: false,
       });
 
     if (error) {
@@ -48,12 +70,6 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-
-    const { data } = supabase.storage
-      .from("documents")
-      .getPublicUrl(storagePath);
-
-    const publicUrl = data.publicUrl;
 
     // ===============================
     // UPDATE (PostgreSQL style)
@@ -67,7 +83,7 @@ export async function POST(req: NextRequest) {
       WHERE booking_number = $3
       `,
       [
-        publicUrl,
+        storagePath,
         now.toISOString(),
         booking
       ]
