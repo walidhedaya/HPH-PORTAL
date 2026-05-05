@@ -16,7 +16,7 @@ const pool = new Pool({
   ssl: shouldUseSsl() ? { rejectUnauthorized: false } : false,
 });
 
-async function init() {
+export async function initDb() {
   try {
     console.log("🔄 Initializing database...");
 
@@ -101,7 +101,5 @@ async function init() {
     console.error("❌ DB INIT ERROR:", error);
   }
 }
-
-init();
 
 export default pool;
