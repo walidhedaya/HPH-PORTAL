@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import db from "@/lib/db";
 import { verifyAdmin } from "@/lib/adminGuard";
-import { ensureUserAccessSchema } from "@/lib/dbInit";
+import { validateCsrfOrigin } from "@/lib/csrfGuard";
 
 export async function POST(req: NextRequest) {
   const admin = await verifyAdmin(req);
@@ -14,16 +14,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   const client = await db.connect();
   let transactionStarted = false;
 
   try {
-    await ensureUserAccessSchema();
-
     const body = await req.json();
 
     const taxId = String(body.tax_id || "").trim().toLowerCase();
     const password = String(body.password || "");
+    const hasBlockedUpdate = typeof body.is_blocked === "boolean";
+    const isBlocked = body.is_blocked === true;
     const allowedTaxIds: string[] = Array.from(
       new Set(
         (body.allowed_tax_ids || [])
@@ -39,9 +42,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!password && allowedTaxIds.length === 0) {
+    if (!password && allowedTaxIds.length === 0 && !hasBlockedUpdate) {
       return NextResponse.json(
-        { error: "Enter a new password or tax IDs to add" },
+        { error: "Enter a new password, tax IDs to add, or blocked status" },
         { status: 400 }
       );
     }
@@ -90,6 +93,7 @@ export async function POST(req: NextRequest) {
     transactionStarted = true;
 
     let passwordUpdated = false;
+    let blockStatusUpdated = false;
 
     if (password) {
       const hash = await bcrypt.hash(password, 10);
@@ -104,6 +108,19 @@ export async function POST(req: NextRequest) {
       );
 
       passwordUpdated = true;
+    }
+
+    if (hasBlockedUpdate) {
+      await client.query(
+        `
+        UPDATE users
+        SET is_blocked = $1
+        WHERE id = $2
+        `,
+        [isBlocked, targetUser.id]
+      );
+
+      blockStatusUpdated = true;
     }
 
     let addedTaxIds = 0;
@@ -133,6 +150,8 @@ export async function POST(req: NextRequest) {
       admin_id: admin.id,
       edited_user: targetUser.tax_id,
       password_updated: passwordUpdated,
+      block_status_updated: blockStatusUpdated,
+      is_blocked: hasBlockedUpdate ? isBlocked : undefined,
       added_tax_ids: addedTaxIds,
       timestamp: new Date().toISOString(),
     });
@@ -140,6 +159,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       password_updated: passwordUpdated,
+      block_status_updated: blockStatusUpdated,
+      is_blocked: hasBlockedUpdate ? isBlocked : undefined,
       added_tax_ids: addedTaxIds,
     });
 

@@ -3,12 +3,26 @@ import { jwtVerify } from "jose";
 
 const SECRET = process.env.JWT_SECRET;
 
+const protectedUserPaths = [
+  "/select-terminal",
+  "/select-service",
+  "/import",
+  "/export",
+];
+
+function isProtectedUserPath(pathname: string) {
+  return protectedUserPaths.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  );
+}
+
 export async function middleware(req: NextRequest) {
   try {
-    // ===============================
-    // ONLY PROTECT ADMIN
-    // ===============================
-    if (!req.nextUrl.pathname.startsWith("/admin")) {
+    const pathname = req.nextUrl.pathname;
+    const isAdminPath = pathname.startsWith("/admin");
+    const isUserPath = isProtectedUserPath(pathname);
+
+    if (!isAdminPath && !isUserPath) {
       return NextResponse.next();
     }
 
@@ -43,7 +57,15 @@ export async function middleware(req: NextRequest) {
     // ===============================
     // ROLE CHECK
     // ===============================
-    if (payload.role !== "admin" && payload.role !== "super_admin") {
+    if (!payload.role) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+
+    if (
+      isAdminPath &&
+      payload.role !== "admin" &&
+      payload.role !== "super_admin"
+    ) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
@@ -58,5 +80,13 @@ export async function middleware(req: NextRequest) {
 
 // ===============================
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/select-terminal",
+    "/select-service",
+    "/import",
+    "/import/:path*",
+    "/export",
+    "/export/:path*",
+  ],
 };

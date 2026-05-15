@@ -21,30 +21,17 @@ export default function AdminImportPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [searchMsg, setSearchMsg] = useState<string | null>(null);
 
-  const [taxId, setTaxId] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [role, setRole] = useState<"user" | "admin">("user");
-  const [fullAccess, setFullAccess] = useState(false);
-  const [allowedTaxIds, setAllowedTaxIds] = useState("");
-  const [userMsg, setUserMsg] = useState<string | null>(null);
-  const [editTaxId, setEditTaxId] = useState("");
-  const [editPassword, setEditPassword] = useState("");
-  const [editConfirm, setEditConfirm] = useState("");
-  const [editAllowedTaxIds, setEditAllowedTaxIds] = useState("");
-  const [editUserMsg, setEditUserMsg] = useState<string | null>(null);
-
-  const terminal =
-    typeof window !== "undefined"
-      ? localStorage.getItem("terminal")
-      : null;
+  const [terminal, setTerminal] = useState<string | null>(null);
 
   // TEMP UI GUARD (real protection = middleware)
   useEffect(() => {
     const storedRole = localStorage.getItem("role");
     if (storedRole !== "admin" && storedRole !== "super_admin") {
       router.push("/login");
+      return;
     }
+
+    setTerminal(localStorage.getItem("terminal"));
   }, [router]);
 
   // Load Queue
@@ -126,111 +113,6 @@ export default function AdminImportPage() {
     }
   };
 
-  // CREATE USER
-  const handleCreateUser = async () => {
-    setUserMsg(null);
-
-    if (!taxId || !password || !confirm) {
-      setUserMsg("All fields are required");
-      return;
-    }
-
-    if (password !== confirm) {
-      setUserMsg("Passwords do not match");
-      return;
-    }
-
-    const res = await fetch("/api/create-user", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        tax_id: taxId.trim(),
-        password,
-        role,
-        full_access: fullAccess,
-        allowed_tax_ids: allowedTaxIds
-          .split(",")
-          .map(t => t.trim())
-          .filter(Boolean),
-      }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      setUserMsg(data.error || "Failed to create user");
-      return;
-    }
-
-    setUserMsg("User created successfully");
-    setTaxId("");
-    setPassword("");
-    setConfirm("");
-    setRole("user");
-    setAllowedTaxIds("");
-    setFullAccess(false);
-  };
-
-  // EDIT USER
-  const handleEditUser = async () => {
-    setEditUserMsg(null);
-
-    if (!editTaxId.trim()) {
-      setEditUserMsg("Tax ID is required");
-      return;
-    }
-
-    if (!editPassword && !editAllowedTaxIds.trim()) {
-      setEditUserMsg("Enter a new password or tax IDs to add");
-      return;
-    }
-
-    if (editPassword !== editConfirm) {
-      setEditUserMsg("Passwords do not match");
-      return;
-    }
-
-    const res = await fetch("/api/edit-user", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        tax_id: editTaxId.trim(),
-        password: editPassword,
-        allowed_tax_ids: editAllowedTaxIds
-          .split(",")
-          .map(t => t.trim())
-          .filter(Boolean),
-      }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      setEditUserMsg(data.error || "Failed to edit user");
-      return;
-    }
-
-    const parts = [];
-
-    if (data.password_updated) parts.push("password updated");
-    if (data.added_tax_ids > 0) {
-      parts.push(`${data.added_tax_ids} tax ID(s) added`);
-    }
-    if (editAllowedTaxIds.trim() && data.added_tax_ids === 0) {
-      parts.push("no new tax IDs added");
-    }
-
-    setEditUserMsg(`User updated: ${parts.join(", ")}`);
-    setEditTaxId("");
-    setEditPassword("");
-    setEditConfirm("");
-    setEditAllowedTaxIds("");
-  };
-
   // LOGOUT
   const handleLogout = async () => {
     try {
@@ -294,102 +176,16 @@ export default function AdminImportPage() {
           </div>
 
           <div className="mini-card">
-            <h4>Create User</h4>
-
-            <input
-              placeholder="Tax ID"
-              value={taxId}
-              onChange={e => setTaxId(e.target.value)}
-            />
-
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-            />
-
-            <input
-              type="password"
-              placeholder="Confirm Password"
-              value={confirm}
-              onChange={e => setConfirm(e.target.value)}
-            />
-
-            <select
-              value={role}
-              onChange={e =>
-                setRole(e.target.value as "admin" | "user")
-              }
-            >
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-            </select>
-
-            <label>
-              <input
-                type="checkbox"
-                checked={fullAccess}
-                onChange={e => setFullAccess(e.target.checked)}
-              />
-              Full Access
-            </label>
-
-            {!fullAccess && (
-              <input
-                placeholder="Allowed Tax IDs (comma separated)"
-                value={allowedTaxIds}
-                onChange={e => setAllowedTaxIds(e.target.value)}
-              />
-            )}
-
-            <button onClick={handleCreateUser}>
-              Create User
+            <h4>Users Control</h4>
+            <button onClick={() => router.push("/admin/users-control")}>
+              Start
             </button>
-
-            {userMsg && <p>{userMsg}</p>}
-          </div>
-
-          <div className="mini-card">
-            <h4>Edit User</h4>
-
-            <input
-              placeholder="Existing User Tax ID"
-              value={editTaxId}
-              onChange={e => setEditTaxId(e.target.value)}
-            />
-
-            <input
-              type="password"
-              placeholder="New Password"
-              value={editPassword}
-              onChange={e => setEditPassword(e.target.value)}
-            />
-
-            <input
-              type="password"
-              placeholder="Confirm New Password"
-              value={editConfirm}
-              onChange={e => setEditConfirm(e.target.value)}
-            />
-
-            <input
-              placeholder="Tax IDs to Add (comma separated)"
-              value={editAllowedTaxIds}
-              onChange={e => setEditAllowedTaxIds(e.target.value)}
-            />
-
-            <button onClick={handleEditUser}>
-              Update User
-            </button>
-
-            {editUserMsg && <p>{editUserMsg}</p>}
           </div>
 
         </div>
 
         <div style={{ marginTop: "40px" }}>
-          <h3>Processing Queue ({terminal})</h3>
+          <h3>Processing Queue ({terminal || "-"})</h3>
 
           <table style={{ width: "100%" }}>
             <thead>

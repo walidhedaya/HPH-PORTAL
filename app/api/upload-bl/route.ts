@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import db from "@/lib/db";
 import * as XLSX from "xlsx";
 import { verifyAdmin } from "@/lib/adminGuard";
+import { validateCsrfOrigin } from "@/lib/csrfGuard";
 
 export async function POST(req: NextRequest) {
 
@@ -16,6 +17,9 @@ export async function POST(req: NextRequest) {
       { status: 403 }
     );
   }
+
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
 
   try {
 

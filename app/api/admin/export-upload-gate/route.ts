@@ -3,6 +3,7 @@ import db from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { verifyAdmin } from "@/lib/adminGuard";
 import { safeStorageName } from "@/lib/security";
+import { validateCsrfOrigin } from "@/lib/csrfGuard";
 
 export async function POST(req: NextRequest) {
 
@@ -14,6 +15,9 @@ export async function POST(req: NextRequest) {
       { status: 401 }
     );
   }
+
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
 
   try {
 

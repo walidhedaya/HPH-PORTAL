@@ -3,16 +3,12 @@ import { NextRequest } from "next/server";
 import db from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { createToken } from "@/lib/auth";
-import { ensureUserAccessSchema } from "@/lib/dbInit";
+import { clearLoginAttempts, isRateLimited } from "@/lib/loginThrottle";
 
 type LoginBody = {
   tax_id: string;
   password: string;
 };
-
-const loginAttempts = new Map<string, { count: number; resetAt: number }>();
-const LOGIN_WINDOW_MS = 15 * 60 * 1000;
-const MAX_LOGIN_ATTEMPTS = 8;
 
 function getClientIp(req: NextRequest) {
   return (
@@ -24,23 +20,6 @@ function getClientIp(req: NextRequest) {
 
 function getLoginKey(req: NextRequest, taxId: string) {
   return `${getClientIp(req)}:${taxId.toLowerCase()}`;
-}
-
-function isRateLimited(key: string) {
-  const now = Date.now();
-  const entry = loginAttempts.get(key);
-
-  if (!entry || entry.resetAt <= now) {
-    loginAttempts.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
-    return false;
-  }
-
-  entry.count += 1;
-  return entry.count > MAX_LOGIN_ATTEMPTS;
-}
-
-function clearLoginAttempts(key: string) {
-  loginAttempts.delete(key);
 }
 
 export async function POST(req: NextRequest) {
@@ -60,11 +39,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await ensureUserAccessSchema();
-
     const loginKey = getLoginKey(req, tax_id);
 
-    if (isRateLimited(loginKey)) {
+    if (await isRateLimited(loginKey)) {
       return NextResponse.json(
         { error: "Too many login attempts. Please try again later." },
         { status: 429 }
@@ -76,7 +53,7 @@ export async function POST(req: NextRequest) {
     // ===============================
     const result = await db.query(
       `
-      SELECT id, tax_id, password, role, full_access
+      SELECT id, tax_id, password, role, full_access, COALESCE(is_blocked, false) AS is_blocked
       FROM users
       WHERE LOWER(tax_id) = LOWER($1)
       LIMIT 1
@@ -105,7 +82,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    clearLoginAttempts(loginKey);
+    if (user.is_blocked) {
+      return NextResponse.json(
+        { error: "User is blocked" },
+        { status: 403 }
+      );
+    }
+
+    await clearLoginAttempts(loginKey);
 
     // ===============================
     // 🔐 CREATE TOKEN (FIXED)

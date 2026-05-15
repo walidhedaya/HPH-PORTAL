@@ -13,6 +13,9 @@ type ExportRow = {
   inspection_containers: number;
   stage: string;
   created_at: string;
+  created_by_user_id?: number | null;
+  created_by_username?: string | null;
+  created_ip?: string | null;
 };
 
 export default function AdminExportPage() {
@@ -50,6 +53,8 @@ export default function AdminExportPage() {
               <th>Inspection</th>
               <th>Stage</th>
               <th>Created</th>
+              <th>Created By</th>
+              <th>IP</th>
             </tr>
           </thead>
           <tbody>
@@ -79,6 +84,8 @@ export default function AdminExportPage() {
                 </td>
                 <td>{row.stage}</td>
                 <td>{row.created_at}</td>
+                <td>{row.created_by_username || row.created_by_user_id || "-"}</td>
+                <td>{row.created_ip || "-"}</td>
               </tr>
             ))}
           </tbody>

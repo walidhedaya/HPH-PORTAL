@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import db from "@/lib/db";
 import { verifyAdmin } from "@/lib/adminGuard";
+import { validateCsrfOrigin } from "@/lib/csrfGuard";
 
 export async function POST(req: NextRequest) {
 
@@ -9,6 +10,9 @@ export async function POST(req: NextRequest) {
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
+
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
 
   try {
 

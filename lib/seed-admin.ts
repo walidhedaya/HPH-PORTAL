@@ -19,11 +19,6 @@ async function seed() {
 
     console.log("🌱 Seeding admin user...");
 
-    await pool.query(`
-      ALTER TABLE users
-      ADD COLUMN IF NOT EXISTS full_access BOOLEAN DEFAULT false
-    `);
-
     // hash password
     const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
 

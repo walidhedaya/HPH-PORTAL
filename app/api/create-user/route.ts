@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import db from "@/lib/db";
 import { verifyAdmin } from "@/lib/adminGuard";
-import { ensureUserAccessSchema } from "@/lib/dbInit";
+import { validateCsrfOrigin } from "@/lib/csrfGuard";
 
 export async function POST(req: NextRequest) {
 
@@ -18,7 +18,49 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   const client = await db.connect();
+  let transactionStarted = false;
+
+  const logAdminCreationAttempt = async ({
+    createdBy,
+    createdUser,
+    createdRole,
+    status,
+    reason,
+  }: {
+    createdBy: number;
+    createdUser: string;
+    createdRole: string;
+    status: "success" | "failure";
+    reason?: string;
+  }) => {
+    try {
+      await client.query(
+        `
+        INSERT INTO admin_actions_log
+        (action_type, action_status, comment, admin_id)
+        VALUES ($1, $2, $3, $4)
+        `,
+        [
+          "create_admin_user",
+          status,
+          JSON.stringify({
+            created_by: createdBy,
+            created_user: createdUser,
+            created_role: createdRole,
+            timestamp: new Date().toISOString(),
+            reason,
+          }),
+          createdBy,
+        ]
+      );
+    } catch (logError) {
+      console.error("ADMIN CREATE USER AUDIT LOG ERROR:", logError);
+    }
+  };
 
   try {
     const body = await req.json();
@@ -26,6 +68,7 @@ export async function POST(req: NextRequest) {
     const tax_id = String(body.tax_id || "").trim().toLowerCase();
     const password = String(body.password || "");
     const role = String(body.role || "");
+    const superAdminPassword = String(body.super_admin_password || "");
 
     // ✅ sanitize + deduplicate
     const allowedTaxIds: string[] = Array.from(
@@ -42,6 +85,16 @@ export async function POST(req: NextRequest) {
     // Validation
     // ===============================
     if (!tax_id || !password || !role) {
+      if (role === "admin") {
+        await logAdminCreationAttempt({
+          createdBy: admin.id,
+          createdUser: tax_id,
+          createdRole: role,
+          status: "failure",
+          reason: "Missing required fields",
+        });
+      }
+
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -56,10 +109,67 @@ export async function POST(req: NextRequest) {
     }
 
     if (password.length < 8) {
+      if (role === "admin") {
+        await logAdminCreationAttempt({
+          createdBy: admin.id,
+          createdUser: tax_id,
+          createdRole: role,
+          status: "failure",
+          reason: "Password must be at least 8 characters",
+        });
+      }
+
       return NextResponse.json(
         { error: "Password must be at least 8 characters" },
         { status: 400 }
       );
+    }
+
+    if (role === "admin") {
+      if (admin.role !== "super_admin") {
+        await logAdminCreationAttempt({
+          createdBy: admin.id,
+          createdUser: tax_id,
+          createdRole: role,
+          status: "failure",
+          reason: "Only super admins can create admins",
+        });
+
+        return NextResponse.json(
+          { error: "Only super admins can create admins" },
+          { status: 403 }
+        );
+      }
+
+      const { rows: superAdminRows } = await client.query(
+        `
+        SELECT password
+        FROM users
+        WHERE id = $1
+        AND role = 'super_admin'
+        LIMIT 1
+        `,
+        [admin.id]
+      );
+
+      const validSuperAdminPassword =
+        superAdminRows.length > 0 &&
+        await bcrypt.compare(superAdminPassword, superAdminRows[0].password);
+
+      if (!validSuperAdminPassword) {
+        await logAdminCreationAttempt({
+          createdBy: admin.id,
+          createdUser: tax_id,
+          createdRole: role,
+          status: "failure",
+          reason: "Invalid super admin password",
+        });
+
+        return NextResponse.json(
+          { error: "Invalid super admin password" },
+          { status: 403 }
+        );
+      }
     }
 
     // ===============================
@@ -89,8 +199,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await ensureUserAccessSchema();
-
     // ===============================
     // Check existing user
     // ===============================
@@ -100,6 +208,16 @@ export async function POST(req: NextRequest) {
     );
 
     if (existing.length > 0) {
+      if (role === "admin") {
+        await logAdminCreationAttempt({
+          createdBy: admin.id,
+          createdUser: tax_id,
+          createdRole: role,
+          status: "failure",
+          reason: "User already exists",
+        });
+      }
+
       return NextResponse.json(
         { error: "User already exists" },
         { status: 400 }
@@ -110,6 +228,7 @@ export async function POST(req: NextRequest) {
     // Start Transaction
     // ===============================
     await client.query("BEGIN");
+    transactionStarted = true;
 
     // ===============================
     // Hash password
@@ -163,10 +282,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (role === "admin") {
+      await logAdminCreationAttempt({
+        createdBy: admin.id,
+        createdUser: tax_id,
+        createdRole: role,
+        status: "success",
+      });
+    }
+
     // ===============================
     // Commit
     // ===============================
     await client.query("COMMIT");
+    transactionStarted = false;
 
     // ===============================
     // Logging
@@ -187,7 +316,9 @@ export async function POST(req: NextRequest) {
 
   } catch (err: any) {
 
-    await client.query("ROLLBACK");
+    if (transactionStarted) {
+      await client.query("ROLLBACK");
+    }
 
     console.error("CREATE USER ERROR:", err);
 

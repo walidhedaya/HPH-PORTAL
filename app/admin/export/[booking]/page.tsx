@@ -16,6 +16,10 @@ type ExportShipment = {
   payment_proof_filename?: string | null;
   final_invoice_filename?: string | null;
   gate_pass_filename?: string | null;
+  created_by_user_id?: number | null;
+  created_by_username?: string | null;
+  created_ip?: string | null;
+  user_agent?: string | null;
 };
 
 export default function AdminExportDetailsPage() {
@@ -124,6 +128,9 @@ export default function AdminExportDetailsPage() {
 
         <p><strong>Terminal:</strong> {shipment.terminal}</p>
         <p><strong>Tax ID:</strong> {shipment.tax_id}</p>
+        <p><strong>Created By:</strong> {shipment.created_by_username || shipment.created_by_user_id || "-"}</p>
+        <p><strong>Created IP:</strong> {shipment.created_ip || "-"}</p>
+        <p><strong>User Agent:</strong> {shipment.user_agent || "-"}</p>
         <p><strong>Stuffing:</strong> {shipment.stuffing ? "Yes" : "No"}</p>
         <p>
           <strong>Inspection:</strong>{" "}

@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
 import { verifyUser } from "@/lib/authGuard";
+import { validateCsrfOrigin } from "@/lib/csrfGuard";
+
+function getClientIp(req: NextRequest) {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
 
 export async function POST(req: NextRequest) {
 
@@ -15,6 +24,9 @@ export async function POST(req: NextRequest) {
       { status: 401 }
     );
   }
+
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
 
   try {
 
@@ -65,12 +77,25 @@ export async function POST(req: NextRequest) {
     // Insert new booking
     // ===============================
     const now = new Date().toISOString();
+    const createdIp = getClientIp(req);
+    const userAgent = (req.headers.get("user-agent") || "unknown").slice(0, 500);
+    const createdByUsername = String(user.tax_id || user.id);
 
     await db.query(
       `
       INSERT INTO export_shipments
-      (booking_number, tax_id, terminal, service_type, created_at)
-      VALUES ($1, $2, $3, $4, $5)
+      (
+        booking_number,
+        tax_id,
+        terminal,
+        service_type,
+        created_at,
+        created_by_user_id,
+        created_by_username,
+        created_ip,
+        user_agent
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `,
       [
         cleanBooking,
@@ -78,6 +103,10 @@ export async function POST(req: NextRequest) {
         cleanTerminal,
         "ENTRY",
         now,
+        user.id,
+        createdByUsername,
+        createdIp,
+        userAgent,
       ]
     );
 

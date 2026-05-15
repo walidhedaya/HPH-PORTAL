@@ -13,6 +13,7 @@ const secret = new TextEncoder().encode(SECRET);
 // ===============================
 type UserPayload = {
   id: number;
+  tax_id?: string;
   role: "user" | "admin" | "super_admin";
   full_access?: boolean;
 };

@@ -66,6 +66,7 @@ export default function ImportPage() {
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [lang, setLang] = useState<"en" | "ar">("en");
+  const [terminal, setTerminal] = useState<string | null>(null);
 
   useEffect(() => {
     const savedLang =
@@ -73,14 +74,11 @@ export default function ImportPage() {
         ? localStorage.getItem("lang")
         : "en";
     if (savedLang === "ar") setLang("ar");
+
+    setTerminal(localStorage.getItem("terminal"));
   }, []);
 
   const t = translations[lang];
-
-  const terminal =
-    typeof window !== "undefined"
-      ? localStorage.getItem("terminal")
-      : null;
 
   async function searchBL() {
     setMessage("");

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
 import { verifyAdmin } from "@/lib/adminGuard";
-import { ensurePaymentColumn } from "@/lib/dbInit";
+import { validateCsrfOrigin } from "@/lib/csrfGuard";
 
 const defaultAllowedDomains = [
   "paymob.com",
@@ -38,9 +38,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  try {
-    await ensurePaymentColumn();
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
 
+  try {
     const { bl, payment_link } = await req.json();
 
     if (!bl || !payment_link) {

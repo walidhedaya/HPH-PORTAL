@@ -1,0 +1,5 @@
+ALTER TABLE shipments
+ADD COLUMN IF NOT EXISTS payment_link TEXT;
+
+ALTER TABLE shipments
+ADD COLUMN IF NOT EXISTS payment_link_set_at TIMESTAMPTZ;

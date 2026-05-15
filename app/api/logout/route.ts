@@ -1,6 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { validateCsrfOrigin } from "@/lib/csrfGuard";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   const res = NextResponse.json({ success: true });
 
   res.cookies.set("auth_token", "", {
